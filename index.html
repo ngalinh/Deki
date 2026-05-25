@@ -824,7 +824,7 @@
         <div id="dashboard-view">
             <div class="header">
                 <div>
-                    <h2 id="welcomeMessage">Dashboard</h2>
+                    <h2>Dashboard</h2>
                     <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Tổng quan hoạt động kinh doanh</p>
                 </div>
                 <div class="header-actions">
@@ -3132,9 +3132,7 @@
                 const raw = currentUser.name || currentUser.email || '';
                 const displayName = raw.includes('@') ? raw.split('@')[0] : raw;
                 const userLabel = document.getElementById('userLabel');
-                if (userLabel) userLabel.textContent = displayName;
-                const welcome = document.getElementById('welcomeMessage');
-                if (welcome) welcome.textContent = `Welcome, ${displayName}`;
+                if (userLabel) userLabel.textContent = `Welcome, ${displayName}`;
                 // Show admin nav nếu là Deki admin
                 if (currentUser.isDekiAdmin) {
                     document.getElementById('navAdmin')?.classList.remove('section-hidden');
