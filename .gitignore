@@ -7,8 +7,18 @@ Thumbs.db
 .idea/
 *.swp
 
-# Temp / data files (local only)
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+.env.local
+
+# Data files (local only)
 *.xlsx
 *.xls
 *.csv
 crm_sample_data.json
+data/

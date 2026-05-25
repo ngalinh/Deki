@@ -723,6 +723,45 @@
             font-weight: 600;
             color: var(--text-dark);
         }
+
+        /* Auth Blocker */
+        .auth-blocker {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 61, 92, 0.96);
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .auth-blocker.active { display: flex; }
+        .auth-blocker .panel {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 48px;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .auth-blocker h2 {
+            font-size: 22px;
+            margin-bottom: 12px;
+            color: var(--text-dark);
+        }
+        .auth-blocker p {
+            color: var(--text-gray);
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        .auth-blocker .email {
+            color: var(--text-dark);
+            font-weight: 500;
+            background: var(--bg-main);
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -730,6 +769,7 @@
     <div class="sidebar">
         <div class="logo">
             <h1>Deki</h1>
+            <div style="margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.5);" id="userLabel"></div>
         </div>
 
         <nav>
@@ -1855,47 +1895,81 @@
                 .replace(/đ/g, 'd').replace(/Đ/g, 'D');
         }
 
-        // ===== LOCAL STORAGE PERSISTENCE =====
-        const STORAGE_KEY = 'deki_crm_customers';
+        // ===== API CLIENT =====
+        const API_BASE = ''; // same origin
+
+        let currentUser = null;
+
+        async function apiGet(path) {
+            const res = await fetch(API_BASE + path, { credentials: 'include' });
+            if (res.status === 401) throw { code: 'NOT_LOGGED_IN', status: 401 };
+            if (res.status === 403) {
+                const body = await res.json().catch(() => ({}));
+                throw { code: body.code || 'FORBIDDEN', status: 403, message: body.error };
+            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function apiDelete(path) {
+            const res = await fetch(API_BASE + path, { method: 'DELETE', credentials: 'include' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function apiUpload(path, file) {
+            const form = new FormData();
+            form.append('file', file);
+            const res = await fetch(API_BASE + path, {
+                method: 'POST', body: form, credentials: 'include'
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+            return body;
+        }
 
         // Sắp xếp khách hàng theo doanh thu giảm dần
         function sortCustomersByRevenue() {
             allCustomers.sort((a, b) => (b.revenue || 0) - (a.revenue || 0));
         }
 
-        // Load saved data từ localStorage (nếu có)
-        function loadCustomersFromStorage() {
+        // Load customers từ server API
+        async function loadCustomersFromAPI() {
             try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (!saved) return false;
-
-                const data = JSON.parse(saved);
-                if (!Array.isArray(data) || data.length === 0) return false;
-
-                // Replace toàn bộ allCustomers bằng data đã lưu
-                allCustomers.splice(0, allCustomers.length, ...data);
+                const result = await apiGet('/api/customers');
+                allCustomers.splice(0, allCustomers.length, ...(result.data || []));
                 return true;
             } catch (err) {
-                console.error('Lỗi load data từ storage:', err);
+                console.error('Lỗi load customers:', err);
                 return false;
             }
         }
 
-        // Lưu allCustomers vào localStorage
-        function saveCustomersToStorage() {
+        // Xóa toàn bộ dữ liệu (server)
+        async function resetData() {
+            if (!confirm('Xóa toàn bộ dữ liệu khách hàng trên server? Hành động này không thể hoàn tác.')) return;
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(allCustomers));
+                await apiDelete('/api/customers');
+                showToast('success', 'Đã xóa', 'Toàn bộ dữ liệu đã được xóa');
+                allCustomers.length = 0;
+                await refreshAll();
             } catch (err) {
-                console.error('Lỗi save data:', err);
-                showToast('error', 'Lỗi lưu dữ liệu', 'Dung lượng vượt giới hạn localStorage');
+                showToast('error', 'Lỗi xóa data', err.message);
             }
         }
 
-        // Xóa toàn bộ dữ liệu (localStorage + memory)
-        function resetData() {
-            if (!confirm('Xóa toàn bộ dữ liệu khách hàng đã upload? Hành động này không thể hoàn tác.')) return;
-            localStorage.removeItem(STORAGE_KEY);
-            location.reload();
+        // Refresh toàn bộ UI sau khi data thay đổi
+        async function refreshAll() {
+            sortCustomersByRevenue();
+            filteredCustomers = [...allCustomers];
+            currentPage = 1;
+            repopulateWebsiteFilter();
+            repopulateEmployeeFilter();
+            populateAdvancedFilterDropdowns();
+            applyFilters();
+            renderDashboardStats();
+            refreshRevenueChart();
+            renderReports();
         }
 
         let filteredCustomers = [...allCustomers];
@@ -2382,156 +2456,34 @@
             return dayStr ? dayStr.substring(0, 7) : null;
         }
 
-        // Handle Excel file upload
+        // Handle Excel upload — upload file lên server, server parse + insert MySQL
         async function handleExcelUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Validate file
             if (!file.name.match(/\.(xlsx|xls)$/i)) {
                 showToast('error', 'Sai định dạng', 'Vui lòng chọn file .xlsx hoặc .xls');
+                event.target.value = '';
                 return;
             }
 
-            // Show loading
             document.getElementById('uploadOverlay').classList.add('active');
 
             try {
-                const arrayBuffer = await file.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-
-                // Find header row (chứa cột "Khách Hàng")
-                let headerRowIndex = -1;
-                for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                    if (rows[i] && rows[i].some(cell => cell && String(cell).toLowerCase().includes('khách hàng'))) {
-                        headerRowIndex = i;
-                        break;
-                    }
-                }
-
-                if (headerRowIndex === -1) {
-                    throw new Error('Không tìm thấy header row chứa "Khách Hàng"');
-                }
-
-                // Map column indexes
-                const headers = rows[headerRowIndex].map(h => h ? String(h).toLowerCase().trim() : '');
-                const colIdx = {
-                    date: headers.findIndex(h => h.includes('thời gian')),
-                    code: headers.findIndex(h => h.includes('mã đơn')),
-                    customer: headers.findIndex(h => h.includes('khách hàng')),
-                    brand: headers.findIndex(h => h === 'brand'),
-                    segment: headers.findIndex(h => h.includes('phân nhóm')),
-                    employee: headers.findIndex(h => h.includes('nhân viên')),
-                    website: headers.findIndex(h => h === 'website'),
-                    total: headers.findIndex(h => h.includes('thành tiền'))
-                };
-
-                if (colIdx.customer === -1 || colIdx.total === -1) {
-                    throw new Error('File Excel thiếu cột bắt buộc (Khách Hàng, Thành tiền)');
-                }
-
-                // Aggregate orders thành customers
-                const dataRows = rows.slice(headerRowIndex + 1).filter(r => r && r[colIdx.customer]);
-                const customerMap = {};
-
-                dataRows.forEach(row => {
-                    const name = String(row[colIdx.customer]).trim();
-                    if (!name) return;
-
-                    if (!customerMap[name]) {
-                        customerMap[name] = {
-                            name: name,
-                            segment: row[colIdx.segment] ? String(row[colIdx.segment]).trim() : 'N/A',
-                            orders: 0,
-                            revenue: 0,
-                            websites: new Set(),
-                            brands: new Set(),
-                            employees: new Set(),
-                            monthlyData: {},
-                            dailyData: {},
-                            allOrders: []
-                        };
-                    }
-
-                    const amount = Number(row[colIdx.total]) || 0;
-                    customerMap[name].orders += 1;
-                    customerMap[name].revenue += amount;
-
-                    // Lưu raw order detail
-                    customerMap[name].allOrders.push({
-                        code: colIdx.code !== -1 && row[colIdx.code] ? String(row[colIdx.code]).trim() : '',
-                        date: row[colIdx.date] ? String(row[colIdx.date]).trim() : '',
-                        website: row[colIdx.website] ? String(row[colIdx.website]).trim() : '',
-                        brand: row[colIdx.brand] ? String(row[colIdx.brand]).trim() : '',
-                        amount: amount
-                    });
-                    if (row[colIdx.website]) {
-                        customerMap[name].websites.add(String(row[colIdx.website]).trim());
-                    }
-                    if (row[colIdx.brand]) {
-                        customerMap[name].brands.add(String(row[colIdx.brand]).trim());
-                    }
-                    if (colIdx.employee !== -1 && row[colIdx.employee]) {
-                        customerMap[name].employees.add(String(row[colIdx.employee]).trim());
-                    }
-
-                    // Group theo ngày + tháng
-                    const dayKey = parseDateToDay(row[colIdx.date]);
-                    if (dayKey) {
-                        if (!customerMap[name].dailyData[dayKey]) {
-                            customerMap[name].dailyData[dayKey] = { orders: 0, revenue: 0 };
-                        }
-                        customerMap[name].dailyData[dayKey].orders += 1;
-                        customerMap[name].dailyData[dayKey].revenue += amount;
-
-                        const monthKey = dayToMonth(dayKey);
-                        if (!customerMap[name].monthlyData[monthKey]) {
-                            customerMap[name].monthlyData[monthKey] = { orders: 0, revenue: 0 };
-                        }
-                        customerMap[name].monthlyData[monthKey].orders += 1;
-                        customerMap[name].monthlyData[monthKey].revenue += amount;
-                    }
-                });
-
-                // Convert Set → Array
-                const newCustomers = Object.values(customerMap).map(c => ({
-                    ...c,
-                    websites: Array.from(c.websites),
-                    brands: Array.from(c.brands),
-                    employees: Array.from(c.employees)
-                }));
-
-                // Merge với data hiện có
-                const result = mergeCustomers(newCustomers);
-
-                // Sort theo doanh thu giảm dần
-                sortCustomersByRevenue();
-
-                // Lưu vào localStorage để giữ lại khi reload trang
-                saveCustomersToStorage();
-
-                // Refresh UI
-                repopulateWebsiteFilter();
-                repopulateEmployeeFilter();
-                populateAdvancedFilterDropdowns();
-                applyFilters();
-                renderDashboardStats();
-                refreshRevenueChart();
-                renderReports();
+                const result = await apiUpload('/api/customers/import', file);
+                // Re-fetch data từ server
+                await loadCustomersFromAPI();
+                await refreshAll();
 
                 document.getElementById('uploadOverlay').classList.remove('active');
                 showToast('success', 'Cập nhật thành công!',
-                    `${result.added} khách mới, ${result.updated} khách cập nhật từ ${dataRows.length} đơn hàng`);
-
+                    `${result.customers} khách, ${result.orders_inserted} đơn mới (tổng ${result.orders_total} đơn)`);
             } catch (error) {
                 document.getElementById('uploadOverlay').classList.remove('active');
-                showToast('error', 'Lỗi đọc file', error.message);
+                showToast('error', 'Lỗi xử lý file', error.message);
                 console.error(error);
             }
 
-            // Reset input để có thể upload lại cùng file
             event.target.value = '';
         }
 
@@ -2974,9 +2926,20 @@
         }
 
         // Initialize customer view khi load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Load data đã lưu (nếu có) trước khi render
-            loadCustomersFromStorage();
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 1) Auth check: gọi /api/me
+            try {
+                const res = await apiGet('/api/me');
+                currentUser = res.user;
+                const userLabel = document.getElementById('userLabel');
+                if (userLabel) userLabel.textContent = currentUser.name || currentUser.email;
+            } catch (err) {
+                showAuthBlocker(err);
+                return; // dừng init, không load data
+            }
+
+            // 2) Load customers từ server
+            await loadCustomersFromAPI();
             sortCustomersByRevenue();
             filteredCustomers = [...allCustomers];
 
@@ -3208,5 +3171,38 @@
             </svg>
         </button>
     </div>
+
+    <!-- Auth Blocker -->
+    <div class="auth-blocker" id="authBlocker">
+        <div class="panel">
+            <div style="font-size: 36px; margin-bottom: 12px;" id="authIcon">🔒</div>
+            <h2 id="authTitle">Cần đăng nhập</h2>
+            <p id="authMessage">Vui lòng đăng nhập basso.vn để sử dụng Deki.</p>
+            <a href="https://ai.basso.vn" target="_blank" class="btn btn-primary" style="text-decoration: none;">
+                Đăng nhập basso.vn
+            </a>
+            <button class="btn btn-secondary" style="margin-left: 8px;" onclick="location.reload()">Thử lại</button>
+        </div>
+    </div>
+
+    <script>
+        function showAuthBlocker(err) {
+            const blocker = document.getElementById('authBlocker');
+            const icon = document.getElementById('authIcon');
+            const title = document.getElementById('authTitle');
+            const message = document.getElementById('authMessage');
+
+            if (err && err.code === 'NO_DEKI_ACCESS') {
+                icon.textContent = '⛔';
+                title.textContent = 'Chưa được phân quyền';
+                message.innerHTML = `Tài khoản <span class="email">${err.message?.match(/[\w.-]+@[\w.-]+/)?.[0] || ''}</span> chưa được cấp quyền dùng Deki.<br>Liên hệ admin để được thêm vào danh sách.`;
+            } else {
+                icon.textContent = '🔒';
+                title.textContent = 'Cần đăng nhập';
+                message.textContent = 'Vui lòng đăng nhập basso.vn để sử dụng Deki.';
+            }
+            blocker.classList.add('active');
+        }
+    </script>
 </body>
 </html>

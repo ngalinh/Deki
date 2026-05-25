@@ -2,12 +2,21 @@
   "name": "deki",
   "version": "1.0.0",
   "description": "Deki CRM - Quản lý khách hàng cho Basso",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server/index.js"
   },
+  "type": "commonjs",
   "engines": {
-    "node": ">=14"
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "mysql2": "^3.11.0",
+    "xlsx": "^0.18.5"
   },
   "repository": {
     "type": "git",
