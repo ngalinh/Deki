@@ -947,7 +947,7 @@
                     <h2>Danh sách khách hàng</h2>
                     <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">902 khách hàng</p>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions section-hidden" id="adminActions">
                     <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
                     <button class="btn btn-secondary" onclick="resetData()" title="Xóa toàn bộ dữ liệu đã upload">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1217,14 +1217,20 @@
 
             <div class="filters" style="margin-bottom: 20px;">
                 <h3 style="margin-bottom: 16px; font-size: 16px;">Thêm / cập nhật user</h3>
-                <div style="display: grid; grid-template-columns: 2fr 2fr auto auto; gap: 12px; align-items: end;">
+                <div style="display: grid; grid-template-columns: 2fr 1.5fr 2fr auto auto; gap: 12px; align-items: end;">
                     <div>
                         <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Email (basso.vn)</label>
                         <input type="email" id="permEmail" class="filter-select" style="width: 100%;" placeholder="user@basso.vn">
                     </div>
                     <div>
                         <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Tên hiển thị</label>
-                        <input type="text" id="permName" class="filter-select" style="width: 100%;" placeholder="VD: Linh Thảo">
+                        <input type="text" id="permName" class="filter-select" style="width: 100%;" placeholder="VD: Linh">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Tên nhân viên (trong Excel)</label>
+                        <select id="permStaffName" class="filter-select" style="width: 100%;">
+                            <option value="">— Không filter (chỉ Admin chọn) —</option>
+                        </select>
                     </div>
                     <div>
                         <label style="display: flex; align-items: center; gap: 6px; padding: 10px 0;">
@@ -1234,7 +1240,8 @@
                     <button class="btn btn-primary" onclick="savePermission()">Lưu</button>
                 </div>
                 <p style="color: var(--text-light); font-size: 12px; margin-top: 12px;">
-                    User phải đã có tài khoản basso.vn. Nếu email đã tồn tại, sẽ cập nhật tên + quyền admin.
+                    <strong>Tên nhân viên</strong>: tên trong cột "Nhân viên duyệt đơn" của Excel. Non-admin chỉ thấy đơn có nhân viên duyệt = tên này.
+                    <br>Admin thấy tất cả đơn nên không cần map.
                 </p>
             </div>
 
@@ -1244,6 +1251,7 @@
                         <tr>
                             <th>Email</th>
                             <th>Tên hiển thị</th>
+                            <th>Tên nhân viên</th>
                             <th>Vai trò</th>
                             <th>Ngày thêm</th>
                             <th>Hành động</th>
@@ -2862,23 +2870,37 @@
 
         async function loadPermissions() {
             try {
-                const result = await apiGet('/api/permissions');
+                // Load song song: permissions + danh sách nhân viên trong DB
+                const [permResult, empResult] = await Promise.all([
+                    apiGet('/api/permissions'),
+                    apiGet('/api/employees').catch(() => ({ data: [] }))
+                ]);
+
+                // Populate dropdown nhân viên
+                const staffSelect = document.getElementById('permStaffName');
+                const currentVal = staffSelect.value;
+                staffSelect.innerHTML = '<option value="">— Không filter (chỉ Admin chọn) —</option>' +
+                    (empResult.data || []).map(name => `<option value="${name}">${name}</option>`).join('');
+                staffSelect.value = currentVal;
+
                 const tbody = document.getElementById('permTableBody');
-                if (!result.data || result.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--text-light);">Chưa có user nào</td></tr>';
+                if (!permResult.data || permResult.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-light);">Chưa có user nào</td></tr>';
                     return;
                 }
-                tbody.innerHTML = result.data.map(u => {
+                tbody.innerHTML = permResult.data.map(u => {
                     const isSelf = u.email === (currentUser?.email || '');
                     const date = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '-';
+                    const editArgs = `'${u.email}', ${JSON.stringify(u.name || '').replace(/"/g, '&quot;')}, ${JSON.stringify(u.staff_name || '').replace(/"/g, '&quot;')}, ${u.is_admin}`;
                     return `
                         <tr>
                             <td class="customer-name">${u.email}${isSelf ? ' <span style="color: var(--text-light); font-size: 12px;">(bạn)</span>' : ''}</td>
                             <td>${u.name || '-'}</td>
+                            <td>${u.staff_name || '<span style="color: var(--text-light);">—</span>'}</td>
                             <td>${u.is_admin ? '<span class="badge ctv">Admin</span>' : '<span class="badge khach-le">User</span>'}</td>
                             <td style="color: var(--text-gray); font-size: 13px;">${date}</td>
                             <td>
-                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="editPermission('${u.email}', ${JSON.stringify(u.name || '').replace(/"/g, '&quot;')}, ${u.is_admin})">Sửa</button>
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="editPermission(${editArgs})">Sửa</button>
                                 ${isSelf ? '' : `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; color: var(--error); border-color: var(--error);" onclick="deletePermission('${u.email}')">Xóa</button>`}
                             </td>
                         </tr>
@@ -2889,9 +2911,10 @@
             }
         }
 
-        function editPermission(email, name, isAdmin) {
+        function editPermission(email, name, staffName, isAdmin) {
             document.getElementById('permEmail').value = email;
             document.getElementById('permName').value = name || '';
+            document.getElementById('permStaffName').value = staffName || '';
             document.getElementById('permAdmin').checked = !!isAdmin;
             document.getElementById('permEmail').focus();
         }
@@ -2899,16 +2922,18 @@
         async function savePermission() {
             const email = document.getElementById('permEmail').value.trim();
             const name = document.getElementById('permName').value.trim();
+            const staff_name = document.getElementById('permStaffName').value.trim();
             const is_admin = document.getElementById('permAdmin').checked;
             if (!email) {
                 showToast('error', 'Thiếu email', 'Vui lòng nhập email');
                 return;
             }
             try {
-                await apiPost('/api/permissions', { email, name, is_admin });
+                await apiPost('/api/permissions', { email, name, staff_name, is_admin });
                 showToast('success', 'Đã lưu', `User ${email} đã được cập nhật`);
                 document.getElementById('permEmail').value = '';
                 document.getElementById('permName').value = '';
+                document.getElementById('permStaffName').value = '';
                 document.getElementById('permAdmin').checked = false;
                 loadPermissions();
             } catch (err) {
@@ -3133,9 +3158,10 @@
                 const displayName = raw.includes('@') ? raw.split('@')[0] : raw;
                 const userLabel = document.getElementById('userLabel');
                 if (userLabel) userLabel.textContent = `Welcome, ${displayName}`;
-                // Show admin nav nếu là Deki admin
+                // Show admin nav + admin actions nếu là Deki admin
                 if (currentUser.isDekiAdmin) {
                     document.getElementById('navAdmin')?.classList.remove('section-hidden');
+                    document.getElementById('adminActions')?.classList.remove('section-hidden');
                 }
             } catch (err) {
                 showAuthBlocker(err);

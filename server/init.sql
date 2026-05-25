@@ -33,10 +33,14 @@ CREATE TABLE IF NOT EXISTS deki_orders (
     INDEX idx_employee (employee)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Bảng deki_permissions: phân quyền user truy cập Deki + lưu tên user
+-- Bảng deki_permissions: phân quyền user truy cập Deki
+--   name       : tên hiển thị trong app
+--   staff_name : tên nhân viên duyệt đơn trong Excel (vd: "Linh Thảo", "Kênh CO")
+--                non-admin chỉ thấy được đơn có employee = staff_name của họ
 CREATE TABLE IF NOT EXISTS deki_permissions (
     email VARCHAR(255) PRIMARY KEY,
     name VARCHAR(128),
+    staff_name VARCHAR(128),
     is_admin TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

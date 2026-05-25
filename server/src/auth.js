@@ -32,16 +32,20 @@ async function verifyBassoSession(cookieHeader) {
         const u = data.user;
         const email = String(u.username).toLowerCase().trim();
 
-        // Lấy tên từ DB permissions (Basso chỉ trả username + roles, không có tên)
-        let dbName = null;
+        // Lấy thông tin từ DB permissions (tên hiển thị + tên nhân viên để filter)
+        let dbName = null, staffName = null;
         try {
-            const rows = await db.query('SELECT name FROM deki_permissions WHERE email = ?', [email]);
-            if (rows.length > 0 && rows[0].name) dbName = rows[0].name;
+            const rows = await db.query('SELECT name, staff_name FROM deki_permissions WHERE email = ?', [email]);
+            if (rows.length > 0) {
+                dbName = rows[0].name || null;
+                staffName = rows[0].staff_name || null;
+            }
         } catch {}
 
         const user = {
             email,
             name: dbName || u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
+            staffName,
             roles: Array.isArray(u.roles) ? u.roles : [],
             raw: u
         };

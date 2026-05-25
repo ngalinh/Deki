@@ -21,6 +21,16 @@ app.use(express.json({ limit: '50mb' }));
 const ROOT_DIR = path.resolve(__dirname, '..');
 app.use(express.static(ROOT_DIR, { index: false }));
 
+// Helper middleware: chỉ cho admin
+function requireAdmin() {
+    return (req, res, next) => {
+        if (!req.user || !req.user.isDekiAdmin) {
+            return res.status(403).json({ success: false, error: 'Chỉ admin mới được phép' });
+        }
+        next();
+    };
+}
+
 // ===== Health =====
 app.get('/health', (req, res) => res.json({ ok: true }));
 
@@ -52,20 +62,62 @@ app.get('/api/me', async (req, res) => {
 // ===== Customers API =====
 
 // GET /api/customers - list customers KÈM allOrders + monthlyData + dailyData để frontend tính chart
+// Phân quyền: admin thấy hết, non-admin chỉ thấy đơn của mình (employee = staffName)
 app.get('/api/customers', requireAuth(), async (req, res) => {
     try {
-        const [customers, allOrders] = await Promise.all([
-            db.query(`
-                SELECT id, name, segment,
-                       total_orders AS orders, total_revenue AS revenue
+        const isAdmin = !!req.user.isDekiAdmin;
+        const staffName = req.user.staffName;
+
+        // Non-admin chưa được map staff_name → không thấy gì
+        if (!isAdmin && !staffName) {
+            return res.json({
+                success: true,
+                data: [],
+                notice: 'Tài khoản chưa được map với tên nhân viên. Liên hệ admin để được cấp.'
+            });
+        }
+
+        // Build query — filter orders theo employee nếu không phải admin
+        const orderWhere = isAdmin ? '' : 'WHERE employee = ?';
+        const orderParams = isAdmin ? [] : [staffName];
+
+        const allOrders = await db.query(
+            `SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
+                    order_date, website, brand, employee, amount
+             FROM deki_orders ${orderWhere}
+             ORDER BY order_date DESC`,
+            orderParams
+        );
+
+        // Lấy danh sách customer_id có orders sau khi filter
+        const customerIds = [...new Set(allOrders.map(o => o.customer_id))];
+        let customers = [];
+        if (isAdmin) {
+            customers = await db.query(`
+                SELECT id, name, segment, total_orders AS orders, total_revenue AS revenue
                 FROM deki_customers ORDER BY total_revenue DESC
-            `),
-            db.query(`
-                SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
-                       order_date, website, brand, employee, amount
-                FROM deki_orders ORDER BY order_date DESC
-            `)
-        ]);
+            `);
+        } else if (customerIds.length > 0) {
+            // Non-admin: chỉ lấy customers có orders → tính orders/revenue từ filtered orders
+            const placeholders = customerIds.map(() => '?').join(',');
+            customers = await db.query(
+                `SELECT id, name, segment FROM deki_customers WHERE id IN (${placeholders})`,
+                customerIds
+            );
+            // Compute orders/revenue per customer từ filtered orders
+            const stats = new Map();
+            for (const o of allOrders) {
+                const s = stats.get(o.customer_id) || { orders: 0, revenue: 0 };
+                s.orders += 1;
+                s.revenue += Number(o.amount) || 0;
+                stats.set(o.customer_id, s);
+            }
+            customers = customers.map(c => ({
+                ...c,
+                orders: stats.get(c.id)?.orders || 0,
+                revenue: stats.get(c.id)?.revenue || 0
+            })).sort((a, b) => b.revenue - a.revenue);
+        }
 
         // Group orders by customer_id
         const byCustomer = new Map();
@@ -136,16 +188,23 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
     }
 });
 
-// GET /api/customers/:id/orders - all orders của 1 khách
+// GET /api/customers/:id/orders - all orders của 1 khách (filter theo staffName nếu non-admin)
 app.get('/api/customers/:id/orders', requireAuth(), async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const orders = await db.query(`
-            SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
-                   website, brand, employee, amount
-            FROM deki_orders WHERE customer_id = ?
-            ORDER BY order_date DESC
-        `, [id]);
+        const isAdmin = !!req.user.isDekiAdmin;
+        const staffName = req.user.staffName;
+        if (!isAdmin && !staffName) return res.json({ success: true, data: [] });
+
+        const where = isAdmin ? 'WHERE customer_id = ?' : 'WHERE customer_id = ? AND employee = ?';
+        const params = isAdmin ? [id] : [id, staffName];
+
+        const orders = await db.query(
+            `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
+                    website, brand, employee, amount
+             FROM deki_orders ${where} ORDER BY order_date DESC`,
+            params
+        );
         const result = orders.map(o => ({ ...o, amount: Number(o.amount) || 0 }));
         res.json({ success: true, data: result });
     } catch (e) {
@@ -153,8 +212,8 @@ app.get('/api/customers/:id/orders', requireAuth(), async (req, res) => {
     }
 });
 
-// POST /api/customers/import - upload Excel, parse, bulk insert
-app.post('/api/customers/import', requireAuth(), upload.single('file'), async (req, res) => {
+// POST /api/customers/import - upload Excel, parse, bulk insert (admin only)
+app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ success: false, error: 'Thiếu file Excel' });
     }
@@ -308,20 +367,25 @@ app.post('/api/customers/import', requireAuth(), upload.single('file'), async (r
 
 // ===== Permissions API (admin only) =====
 
-function requireAdmin() {
-    return (req, res, next) => {
-        if (!req.user || !req.user.isDekiAdmin) {
-            return res.status(403).json({ success: false, error: 'Chỉ admin mới được phép' });
-        }
-        next();
-    };
-}
-
 // GET /api/permissions - list users
 app.get('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
-        const rows = await db.query('SELECT email, name, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
+        const rows = await db.query('SELECT email, name, staff_name, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
         res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/employees - danh sách tên nhân viên trong dữ liệu (cho admin chọn map)
+app.get('/api/employees', requireAuth(), requireAdmin(), async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT DISTINCT employee FROM deki_orders
+             WHERE employee IS NOT NULL AND employee != ''
+             ORDER BY employee`
+        );
+        res.json({ success: true, data: rows.map(r => r.employee) });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
@@ -330,13 +394,13 @@ app.get('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
 // POST /api/permissions - add/update user
 app.post('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
-        const { email, name, is_admin } = req.body;
+        const { email, name, staff_name, is_admin } = req.body;
         if (!email) return res.status(400).json({ success: false, error: 'Thiếu email' });
         const cleanEmail = String(email).toLowerCase().trim();
         await db.query(
-            `INSERT INTO deki_permissions (email, name, is_admin) VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE name = VALUES(name), is_admin = VALUES(is_admin)`,
-            [cleanEmail, name || null, is_admin ? 1 : 0]
+            `INSERT INTO deki_permissions (email, name, staff_name, is_admin) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name), staff_name = VALUES(staff_name), is_admin = VALUES(is_admin)`,
+            [cleanEmail, name || null, staff_name || null, is_admin ? 1 : 0]
         );
         clearSessionCache(); // để user nhìn thấy tên/quyền mới ngay
         res.json({ success: true });

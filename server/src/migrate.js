@@ -21,6 +21,23 @@ async function runMigrations() {
         }
         console.log(`[migrate] Đã chạy ${statements.length} statement từ init.sql`);
 
+        // Migration: thêm cột staff_name vào deki_permissions nếu chưa có
+        // (CREATE TABLE IF NOT EXISTS sẽ không thêm cột mới khi table đã tồn tại)
+        try {
+            const cols = await db.query(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'deki_permissions'
+                   AND COLUMN_NAME = 'staff_name'`
+            );
+            if (cols.length === 0) {
+                await pool.query(`ALTER TABLE deki_permissions ADD COLUMN staff_name VARCHAR(128) AFTER name`);
+                console.log('[migrate] Đã thêm cột staff_name vào deki_permissions');
+            }
+        } catch (e) {
+            console.error('[migrate] staff_name migration error:', e.message);
+        }
+
         // Insert super admin từ env (nếu chưa có)
         const superAdmin = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().trim();
         if (superAdmin) {
