@@ -7,7 +7,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 
 const db = require('./src/db');
-const { requireAuth, verifyBassoSession } = require('./src/auth');
+const { requireAuth, verifyBassoSession, isDekiAdmin, hasAccess } = require('./src/auth');
 const { runMigrations } = require('./src/migrate');
 
 const app = express();
@@ -25,7 +25,7 @@ app.use(express.static(ROOT_DIR, { index: false }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // ===== Auth: /api/me =====
-// Frontend tự gọi để check login + lấy roles
+// Frontend tự gọi để check login + lấy roles + isDekiAdmin
 app.get('/api/me', async (req, res) => {
     const cookie = req.headers.cookie || '';
     const user = await verifyBassoSession(cookie);
@@ -36,6 +36,16 @@ app.get('/api/me', async (req, res) => {
             code: 'NOT_LOGGED_IN'
         });
     }
+    const access = await hasAccess(user.email);
+    if (!access) {
+        return res.status(403).json({
+            success: false,
+            error: 'Bạn chưa được phân quyền sử dụng Deki. Liên hệ admin để được cấp quyền.',
+            code: 'NO_DEKI_ACCESS',
+            email: user.email
+        });
+    }
+    user.isDekiAdmin = await isDekiAdmin(user.email);
     res.json({ success: true, user });
 });
 
@@ -292,6 +302,59 @@ app.post('/api/customers/import', requireAuth(), upload.single('file'), async (r
         }
     } catch (e) {
         console.error('[api/import] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ===== Permissions API (admin only) =====
+
+function requireAdmin() {
+    return (req, res, next) => {
+        if (!req.user || !req.user.isDekiAdmin) {
+            return res.status(403).json({ success: false, error: 'Chỉ admin mới được phép' });
+        }
+        next();
+    };
+}
+
+// GET /api/permissions - list users
+app.get('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
+    try {
+        const rows = await db.query('SELECT email, name, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/permissions - add/update user
+app.post('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
+    try {
+        const { email, name, is_admin } = req.body;
+        if (!email) return res.status(400).json({ success: false, error: 'Thiếu email' });
+        const cleanEmail = String(email).toLowerCase().trim();
+        await db.query(
+            `INSERT INTO deki_permissions (email, name, is_admin) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name), is_admin = VALUES(is_admin)`,
+            [cleanEmail, name || null, is_admin ? 1 : 0]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/permissions/:email - remove user
+app.delete('/api/permissions/:email', requireAuth(), requireAdmin(), async (req, res) => {
+    try {
+        const email = String(req.params.email).toLowerCase().trim();
+        // Không cho xóa chính mình
+        if (email === req.user.email) {
+            return res.status(400).json({ success: false, error: 'Không thể xóa chính mình' });
+        }
+        await db.query('DELETE FROM deki_permissions WHERE email = ?', [email]);
+        res.json({ success: true });
+    } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });

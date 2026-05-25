@@ -808,6 +808,13 @@
                 </svg>
                 Lọc khách hàng
             </a>
+
+            <a href="#" class="nav-item section-hidden" id="navAdmin" onclick="showView('admin')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 1l3 6 6 .9-4.5 4.4 1 6.2L12 15.8 6.5 18.5l1-6.2L3 7.9 9 7z"></path>
+                </svg>
+                Quản lý quyền
+            </a>
         </nav>
     </div>
 
@@ -1198,6 +1205,54 @@
                 </div>
             </div>
         </div>
+
+        <!-- Admin Panel View -->
+        <div id="admin-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Quản lý quyền</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Cấp/thu hồi quyền truy cập Deki cho user Basso</p>
+                </div>
+            </div>
+
+            <div class="filters" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 16px; font-size: 16px;">Thêm / cập nhật user</h3>
+                <div style="display: grid; grid-template-columns: 2fr 2fr auto auto; gap: 12px; align-items: end;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Email (basso.vn)</label>
+                        <input type="email" id="permEmail" class="filter-select" style="width: 100%;" placeholder="user@basso.vn">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Tên hiển thị</label>
+                        <input type="text" id="permName" class="filter-select" style="width: 100%;" placeholder="VD: Linh Thảo">
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 6px; padding: 10px 0;">
+                            <input type="checkbox" id="permAdmin"> Admin
+                        </label>
+                    </div>
+                    <button class="btn btn-primary" onclick="savePermission()">Lưu</button>
+                </div>
+                <p style="color: var(--text-light); font-size: 12px; margin-top: 12px;">
+                    User phải đã có tài khoản basso.vn. Nếu email đã tồn tại, sẽ cập nhật tên + quyền admin.
+                </p>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Tên hiển thị</th>
+                            <th>Vai trò</th>
+                            <th>Ngày thêm</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permTableBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1207,9 +1262,13 @@
             document.getElementById('customers-view').classList.add('section-hidden');
             document.getElementById('reports-view').classList.add('section-hidden');
             document.getElementById('filters-view').classList.add('section-hidden');
+            document.getElementById('admin-view')?.classList.add('section-hidden');
 
             // Show selected view
             document.getElementById(viewName + '-view').classList.remove('section-hidden');
+
+            // Lazy-load data cho admin view
+            if (viewName === 'admin') loadPermissions();
 
             // Update active nav
             document.querySelectorAll('.nav-item').forEach(item => {
@@ -2788,6 +2847,86 @@
         }
 
         // Render báo cáo & phân tích từ allCustomers (filtered theo currentReportPeriod)
+        // ===== ADMIN PANEL =====
+        async function apiPost(path, body) {
+            const res = await fetch(apiUrl(path), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(body)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            return data;
+        }
+
+        async function loadPermissions() {
+            try {
+                const result = await apiGet('/api/permissions');
+                const tbody = document.getElementById('permTableBody');
+                if (!result.data || result.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--text-light);">Chưa có user nào</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = result.data.map(u => {
+                    const isSelf = u.email === (currentUser?.email || '');
+                    const date = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '-';
+                    return `
+                        <tr>
+                            <td class="customer-name">${u.email}${isSelf ? ' <span style="color: var(--text-light); font-size: 12px;">(bạn)</span>' : ''}</td>
+                            <td>${u.name || '-'}</td>
+                            <td>${u.is_admin ? '<span class="badge ctv">Admin</span>' : '<span class="badge khach-le">User</span>'}</td>
+                            <td style="color: var(--text-gray); font-size: 13px;">${date}</td>
+                            <td>
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="editPermission('${u.email}', ${JSON.stringify(u.name || '').replace(/"/g, '&quot;')}, ${u.is_admin})">Sửa</button>
+                                ${isSelf ? '' : `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; color: var(--error); border-color: var(--error);" onclick="deletePermission('${u.email}')">Xóa</button>`}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                showToast('error', 'Lỗi load danh sách', err.message);
+            }
+        }
+
+        function editPermission(email, name, isAdmin) {
+            document.getElementById('permEmail').value = email;
+            document.getElementById('permName').value = name || '';
+            document.getElementById('permAdmin').checked = !!isAdmin;
+            document.getElementById('permEmail').focus();
+        }
+
+        async function savePermission() {
+            const email = document.getElementById('permEmail').value.trim();
+            const name = document.getElementById('permName').value.trim();
+            const is_admin = document.getElementById('permAdmin').checked;
+            if (!email) {
+                showToast('error', 'Thiếu email', 'Vui lòng nhập email');
+                return;
+            }
+            try {
+                await apiPost('/api/permissions', { email, name, is_admin });
+                showToast('success', 'Đã lưu', `User ${email} đã được cập nhật`);
+                document.getElementById('permEmail').value = '';
+                document.getElementById('permName').value = '';
+                document.getElementById('permAdmin').checked = false;
+                loadPermissions();
+            } catch (err) {
+                showToast('error', 'Lỗi lưu', err.message);
+            }
+        }
+
+        async function deletePermission(email) {
+            if (!confirm(`Xóa quyền truy cập của ${email}?`)) return;
+            try {
+                await apiDelete('/api/permissions/' + encodeURIComponent(email));
+                showToast('success', 'Đã xóa', `Đã thu hồi quyền của ${email}`);
+                loadPermissions();
+            } catch (err) {
+                showToast('error', 'Lỗi xóa', err.message);
+            }
+        }
+
         function renderReports() {
             const period = currentReportPeriod;
             const range = period === 'all' ? null : getReportDateRange(period);
@@ -2992,9 +3131,12 @@
                 currentUser = res.user;
                 const userLabel = document.getElementById('userLabel');
                 if (userLabel) {
-                    // Hiển thị tên — nếu fallback về email thì cắt lấy phần trước '@'
                     const raw = currentUser.name || currentUser.email || '';
                     userLabel.textContent = raw.includes('@') ? raw.split('@')[0] : raw;
+                }
+                // Show admin nav nếu là Deki admin
+                if (currentUser.isDekiAdmin) {
+                    document.getElementById('navAdmin')?.classList.remove('section-hidden');
                 }
             } catch (err) {
                 showAuthBlocker(err);
