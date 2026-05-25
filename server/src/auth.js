@@ -30,9 +30,18 @@ async function verifyBassoSession(cookieHeader) {
             return null;
         }
         const u = data.user;
+        const email = String(u.username).toLowerCase().trim();
+
+        // Lấy tên từ DB permissions (Basso chỉ trả username + roles, không có tên)
+        let dbName = null;
+        try {
+            const rows = await db.query('SELECT name FROM permissions WHERE email = ?', [email]);
+            if (rows.length > 0 && rows[0].name) dbName = rows[0].name;
+        } catch {}
+
         const user = {
-            email: String(u.username).toLowerCase().trim(),
-            name: u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
+            email,
+            name: dbName || u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
             roles: Array.isArray(u.roles) ? u.roles : [],
             raw: u
         };

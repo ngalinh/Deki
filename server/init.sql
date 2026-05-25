@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS orders (
 -- Bảng permissions: phân quyền user truy cập Deki (giống Xeko's user-permissions.json)
 CREATE TABLE IF NOT EXISTS permissions (
     email VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(128),
     is_admin TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
