@@ -1,0 +1,18 @@
+{
+  "name": "deki",
+  "version": "1.0.0",
+  "description": "Deki CRM - Quản lý khách hàng cho Basso",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ngalinh/Deki.git"
+  },
+  "author": "ngalinh",
+  "license": "ISC"
+}
