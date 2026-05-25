@@ -8,6 +8,7 @@ const XLSX = require('xlsx');
 
 const db = require('./src/db');
 const { requireAuth, verifyBassoSession } = require('./src/auth');
+const { runMigrations } = require('./src/migrate');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -314,7 +315,14 @@ app.get(/^(?!\/api|\/health).*/, (req, res) => {
     res.sendFile(path.join(ROOT_DIR, 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`Deki server listening on port ${PORT}`);
-    console.log(`Frontend: http://localhost:${PORT}`);
-});
+// Start: chạy migrations rồi mới listen
+(async () => {
+    try {
+        await runMigrations();
+    } catch (e) {
+        console.error('[startup] Migration failed, server vẫn start nhưng API có thể lỗi:', e.message);
+    }
+    app.listen(PORT, () => {
+        console.log(`Deki server listening on port ${PORT}`);
+    });
+})();

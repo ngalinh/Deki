@@ -1,0 +1,41 @@
+// Auto-migrate: tạo tables + insert super admin lúc server start
+const fs = require('fs');
+const path = require('path');
+const db = require('./db');
+
+async function runMigrations() {
+    try {
+        // Đọc init.sql
+        const sqlPath = path.join(__dirname, '..', 'init.sql');
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+
+        // Split theo `;` để chạy từng statement (bỏ comments + empty lines)
+        const statements = sql
+            .split(';')
+            .map(s => s.replace(/--[^\n]*/g, '').trim())
+            .filter(s => s.length > 0);
+
+        const pool = db.getPool();
+        for (const stmt of statements) {
+            await pool.query(stmt);
+        }
+        console.log(`[migrate] Đã chạy ${statements.length} statement từ init.sql`);
+
+        // Insert super admin từ env (nếu chưa có)
+        const superAdmin = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().trim();
+        if (superAdmin) {
+            await db.query(
+                `INSERT INTO deki_permissions (email, name, is_admin)
+                 VALUES (?, ?, 1)
+                 ON DUPLICATE KEY UPDATE is_admin = 1`,
+                [superAdmin, superAdmin.split('@')[0]]
+            );
+            console.log(`[migrate] Super admin ready: ${superAdmin}`);
+        }
+    } catch (err) {
+        console.error('[migrate] Error:', err.message);
+        throw err;
+    }
+}
+
+module.exports = { runMigrations };
