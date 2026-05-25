@@ -29,11 +29,12 @@ async function verifyBassoSession(cookieHeader) {
             sessionCache.set(key, { user: null, expiresAt: Date.now() + CACHE_TTL_MS });
             return null;
         }
+        const u = data.user;
         const user = {
-            email: String(data.user.username).toLowerCase().trim(),
-            name: data.user.full_name || data.user.name || data.user.username,
-            roles: Array.isArray(data.user.roles) ? data.user.roles : [],
-            raw: data.user
+            email: String(u.username).toLowerCase().trim(),
+            name: u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
+            roles: Array.isArray(u.roles) ? u.roles : [],
+            raw: u
         };
         sessionCache.set(key, { user, expiresAt: Date.now() + CACHE_TTL_MS });
         return user;

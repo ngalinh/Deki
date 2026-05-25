@@ -2943,7 +2943,11 @@
                 const res = await apiGet('/api/me');
                 currentUser = res.user;
                 const userLabel = document.getElementById('userLabel');
-                if (userLabel) userLabel.textContent = currentUser.name || currentUser.email;
+                if (userLabel) {
+                    // Hiển thị tên — nếu fallback về email thì cắt lấy phần trước '@'
+                    const raw = currentUser.name || currentUser.email || '';
+                    userLabel.textContent = raw.includes('@') ? raw.split('@')[0] : raw;
+                }
             } catch (err) {
                 showAuthBlocker(err);
                 return; // dừng init, không load data
