@@ -1567,19 +1567,64 @@
         });
 
         // Data từ phân tích DS_DONHANG.xlsx
-        const segmentData = {
-            labels: ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'],
-            data: [10826984983, 3928883968, 3831219679, 1088911606, 84366936],
-            counts: [212, 508, 169, 11, 2]
-        };
+        // Pie chart segment & bar chart website data - tính từ allCustomers (sẽ update qua refreshDashboardCharts)
+        const segmentData = { labels: [], data: [], counts: [] };
+        const websiteData = { labels: [], orders: [], revenue: [] };
 
-        const websiteData = {
-            labels: ['macys.com', 'usa.tommy.com', 'lacoste.com', 'amazon.com', 'ebay.com',
-                     'sephora.com', 'calvinklein.us', 'us.puma.com', 'jomashop.com', 'belk.com'],
-            orders: [1708, 858, 588, 450, 251, 244, 194, 191, 176, 169],
-            revenue: [5691860600, 1531483331, 1728918511, 1458111863, 1252776256,
-                      768157686, 263456974, 326624908, 547025035, 289456123]
-        };
+        // Recompute segment + website data từ allCustomers + refresh 2 charts
+        function refreshDashboardCharts() {
+            // Segment
+            const segs = {};
+            allCustomers.forEach(c => {
+                const seg = c.segment || 'N/A';
+                if (!segs[seg]) segs[seg] = { count: 0, revenue: 0 };
+                segs[seg].count += 1;
+                segs[seg].revenue += (c.revenue || 0);
+            });
+            const segOrder = ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'];
+            segmentData.labels = [];
+            segmentData.data = [];
+            segmentData.counts = [];
+            segOrder.forEach(name => {
+                if (segs[name]) {
+                    segmentData.labels.push(name);
+                    segmentData.data.push(segs[name].revenue);
+                    segmentData.counts.push(segs[name].count);
+                }
+            });
+            // Còn các segment khác (vd 'N/A')
+            Object.keys(segs).filter(s => !segOrder.includes(s)).forEach(name => {
+                segmentData.labels.push(name);
+                segmentData.data.push(segs[name].revenue);
+                segmentData.counts.push(segs[name].count);
+            });
+
+            if (segmentChart) {
+                segmentChart.data.labels = segmentData.labels;
+                segmentChart.data.datasets[0].data = segmentData.data;
+                segmentChart.update();
+            }
+
+            // Top 10 Website theo số đơn (tính từ allOrders)
+            const webCount = {}, webRev = {};
+            allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                if (!o.website || o.website === 'N/A') return;
+                webCount[o.website] = (webCount[o.website] || 0) + 1;
+                webRev[o.website] = (webRev[o.website] || 0) + (o.amount || 0);
+            }));
+            const top = Object.entries(webCount)
+                .map(([name, orders]) => ({ name, orders, revenue: webRev[name] || 0 }))
+                .sort((a, b) => b.orders - a.orders).slice(0, 10);
+            websiteData.labels = top.map(t => t.name);
+            websiteData.orders = top.map(t => t.orders);
+            websiteData.revenue = top.map(t => t.revenue);
+
+            if (websiteChart) {
+                websiteChart.data.labels = websiteData.labels;
+                websiteChart.data.datasets[0].data = websiteData.orders;
+                websiteChart.update();
+            }
+        }
 
         // Tính revenue dataset cho chart từ allCustomers (week / month / year)
         function getRevenueData(period) {
@@ -1727,9 +1772,10 @@
         }
 
         // Chart 2: Phân nhóm khách hàng (Pie Chart)
+        let segmentChart;
         const segmentCtx = document.getElementById('segmentChart');
         if (segmentCtx) {
-            new Chart(segmentCtx, {
+            segmentChart = new Chart(segmentCtx, {
                 type: 'doughnut',
                 data: {
                     labels: segmentData.labels,
@@ -1791,9 +1837,10 @@
         }
 
         // Chart 3: Top 10 Website (Bar Chart)
+        let websiteChart;
         const websiteCtx = document.getElementById('websiteChart');
         if (websiteCtx) {
-            new Chart(websiteCtx, {
+            websiteChart = new Chart(websiteCtx, {
                 type: 'bar',
                 data: {
                     labels: websiteData.labels,
@@ -1980,6 +2027,7 @@
             applyFilters();
             renderDashboardStats();
             refreshRevenueChart();
+            refreshDashboardCharts();
             renderReports();
         }
 
@@ -2964,6 +3012,7 @@
             renderCustomerTable(allCustomers);
             renderDashboardStats();
             refreshRevenueChart();
+            refreshDashboardCharts();
             renderReports();
 
             // Event listeners
