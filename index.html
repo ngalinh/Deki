@@ -1896,12 +1896,23 @@
         }
 
         // ===== API CLIENT =====
-        const API_BASE = ''; // same origin
+        // Tự detect base path để hoạt động cả khi app serve dưới subpath (vd: /b/xxx/)
+        const API_BASE = (() => {
+            // Lấy thư mục chứa trang hiện tại (loại bỏ filename nếu có)
+            const p = location.pathname.replace(/\/[^/]*\.html?$/i, '/').replace(/\/?$/, '');
+            return p; // không có trailing slash
+        })();
 
         let currentUser = null;
 
+        // Build URL từ path tương đối (vd '/api/me' → '/b/xxx/api/me')
+        function apiUrl(path) {
+            const clean = path.startsWith('/') ? path : '/' + path;
+            return API_BASE + clean;
+        }
+
         async function apiGet(path) {
-            const res = await fetch(API_BASE + path, { credentials: 'include' });
+            const res = await fetch(apiUrl(path), { credentials: 'include' });
             if (res.status === 401) throw { code: 'NOT_LOGGED_IN', status: 401 };
             if (res.status === 403) {
                 const body = await res.json().catch(() => ({}));
@@ -1912,7 +1923,7 @@
         }
 
         async function apiDelete(path) {
-            const res = await fetch(API_BASE + path, { method: 'DELETE', credentials: 'include' });
+            const res = await fetch(apiUrl(path), { method: 'DELETE', credentials: 'include' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
         }
@@ -1920,7 +1931,7 @@
         async function apiUpload(path, file) {
             const form = new FormData();
             form.append('file', file);
-            const res = await fetch(API_BASE + path, {
+            const res = await fetch(apiUrl(path), {
                 method: 'POST', body: form, credentials: 'include'
             });
             const body = await res.json().catch(() => ({}));
