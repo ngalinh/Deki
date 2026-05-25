@@ -47,12 +47,12 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
             db.query(`
                 SELECT id, name, segment,
                        total_orders AS orders, total_revenue AS revenue
-                FROM customers ORDER BY total_revenue DESC
+                FROM deki_customers ORDER BY total_revenue DESC
             `),
             db.query(`
                 SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
                        order_date, website, brand, employee, amount
-                FROM orders ORDER BY order_date DESC
+                FROM deki_orders ORDER BY order_date DESC
             `)
         ]);
 
@@ -132,7 +132,7 @@ app.get('/api/customers/:id/orders', requireAuth(), async (req, res) => {
         const orders = await db.query(`
             SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
                    website, brand, employee, amount
-            FROM orders WHERE customer_id = ?
+            FROM deki_orders WHERE customer_id = ?
             ORDER BY order_date DESC
         `, [id]);
         const result = orders.map(o => ({ ...o, amount: Number(o.amount) || 0 }));
@@ -233,14 +233,14 @@ app.post('/api/customers/import', requireAuth(), upload.single('file'), async (r
             // Upsert customers
             for (const [name, info] of customersMap) {
                 await conn.execute(
-                    `INSERT INTO customers (name, segment) VALUES (?, ?)
+                    `INSERT INTO deki_customers (name, segment) VALUES (?, ?)
                      ON DUPLICATE KEY UPDATE segment = COALESCE(VALUES(segment), segment)`,
                     [name, info.segment]
                 );
             }
 
             // Fetch customer id map
-            const [custRows] = await conn.execute('SELECT id, name FROM customers');
+            const [custRows] = await conn.execute('SELECT id, name FROM deki_customers');
             const idMap = new Map(custRows.map(r => [r.name, r.id]));
 
             // Insert orders (skip duplicate codes)
@@ -257,7 +257,7 @@ app.post('/api/customers/import', requireAuth(), upload.single('file'), async (r
                     values.push(cid, o.code, o.date, o.website, o.brand, o.employee, o.amount);
                 }
                 if (placeholders.length > 0) {
-                    const sql = `INSERT IGNORE INTO orders
+                    const sql = `INSERT IGNORE INTO deki_orders
                         (customer_id, order_code, order_date, website, brand, employee, amount)
                         VALUES ${placeholders.join(', ')}`;
                     const [r] = await conn.execute(sql, values);
@@ -267,10 +267,10 @@ app.post('/api/customers/import', requireAuth(), upload.single('file'), async (r
 
             // Update customer aggregates
             await conn.execute(`
-                UPDATE customers c
+                UPDATE deki_customers c
                 LEFT JOIN (
                     SELECT customer_id, COUNT(*) AS cnt, SUM(amount) AS total
-                    FROM orders GROUP BY customer_id
+                    FROM deki_orders GROUP BY customer_id
                 ) o ON o.customer_id = c.id
                 SET c.total_orders = COALESCE(o.cnt, 0), c.total_revenue = COALESCE(o.total, 0)
             `);
@@ -301,8 +301,8 @@ app.delete('/api/customers', requireAuth(), async (req, res) => {
         return res.status(403).json({ success: false, error: 'Chỉ admin được phép xóa' });
     }
     try {
-        await db.query('DELETE FROM orders');
-        await db.query('DELETE FROM customers');
+        await db.query('DELETE FROM deki_orders');
+        await db.query('DELETE FROM deki_customers');
         res.json({ success: true, message: 'Đã xóa toàn bộ data' });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });

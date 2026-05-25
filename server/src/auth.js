@@ -35,7 +35,7 @@ async function verifyBassoSession(cookieHeader) {
         // Lấy tên từ DB permissions (Basso chỉ trả username + roles, không có tên)
         let dbName = null;
         try {
-            const rows = await db.query('SELECT name FROM permissions WHERE email = ?', [email]);
+            const rows = await db.query('SELECT name FROM deki_permissions WHERE email = ?', [email]);
             if (rows.length > 0 && rows[0].name) dbName = rows[0].name;
         } catch {}
 
@@ -58,7 +58,7 @@ async function hasAccess(email) {
     if (!email) return false;
     if (email === SUPER_ADMIN_EMAIL) return true;
     try {
-        const rows = await db.query('SELECT email FROM permissions WHERE email = ?', [email]);
+        const rows = await db.query('SELECT email FROM deki_permissions WHERE email = ?', [email]);
         return rows.length > 0;
     } catch (e) {
         console.error('[auth] hasAccess DB error:', e.message);
@@ -70,7 +70,7 @@ async function isDekiAdmin(email) {
     if (!email) return false;
     if (email === SUPER_ADMIN_EMAIL) return true;
     try {
-        const rows = await db.query('SELECT is_admin FROM permissions WHERE email = ?', [email]);
+        const rows = await db.query('SELECT is_admin FROM deki_permissions WHERE email = ?', [email]);
         return rows.length > 0 && rows[0].is_admin === 1;
     } catch {
         return false;
