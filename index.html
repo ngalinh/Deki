@@ -1,0 +1,3212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deki - Quản lý khách hàng</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00BCD4;
+            --primary-dark: #0097A7;
+            --secondary: #003D5C;
+            --accent: #FFB84D;
+            --bg-main: #F5F7FA;
+            --bg-white: #FFFFFF;
+            --text-dark: #1A2332;
+            --text-gray: #6B7280;
+            --text-light: #9CA3AF;
+            --border: #E5E7EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: var(--secondary);
+            color: white;
+            padding: 24px 0;
+            z-index: 100;
+        }
+
+        .logo {
+            padding: 0 24px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 24px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo span {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            font-weight: 400;
+        }
+
+        .nav-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(0, 188, 212, 0.1);
+            color: var(--primary);
+            border-left: 3px solid var(--primary);
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 20px 32px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-dark);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon.primary { background: rgba(0, 188, 212, 0.1); color: var(--primary); }
+        .stat-icon.success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .stat-icon.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .stat-icon.secondary { background: rgba(0, 61, 92, 0.1); color: var(--secondary); }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-gray);
+        }
+
+        .stat-trend {
+            font-size: 12px;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .stat-trend.down {
+            color: var(--error);
+        }
+
+        /* Filters */
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 16px 10px 42px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+        }
+
+        .search-box svg {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            color: var(--text-light);
+        }
+
+        .filter-select {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg-main);
+        }
+
+        th {
+            padding: 16px 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        tbody tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-main);
+        }
+
+        .customer-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge.si-vua { background: rgba(0, 188, 212, 0.1); color: var(--primary); }
+        .badge.khach-le { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .badge.ctv { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .badge.si-to { background: rgba(139, 92, 246, 0.1); color: #8B5CF6; }
+        .badge.si-nho { background: rgba(236, 72, 153, 0.1); color: #EC4899; }
+
+        .websites-tag {
+            font-size: 12px;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Charts placeholder */
+        .chart-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .chart-placeholder {
+            height: 300px;
+            background: var(--bg-main);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            gap: 0;
+            background: var(--bg-main);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-gray);
+        }
+
+        .view-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section-hidden {
+            display: none;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            min-width: 320px;
+            max-width: 420px;
+            transform: translateX(calc(100% + 48px));
+            opacity: 0;
+            visibility: hidden;
+            transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s;
+            border-left: 4px solid var(--primary);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--error); }
+        .toast.info { border-left-color: var(--primary); }
+
+        .toast-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .toast.error .toast-icon { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+        .toast.info .toast-icon { background: rgba(0, 188, 212, 0.1); color: var(--primary); }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: var(--text-dark);
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: var(--text-gray);
+        }
+
+        /* Upload Loading */
+        .upload-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1500;
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-overlay.active {
+            display: flex;
+        }
+
+        .upload-loading {
+            background: white;
+            padding: 32px 48px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Customer Detail Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-main);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--border);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 24px 32px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .info-item {
+            padding: 16px;
+            background: var(--bg-main);
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-gray);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin: 24px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .website-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .website-chip {
+            padding: 6px 12px;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .website-chip .count {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .order-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .order-item {
+            padding: 16px;
+            background: var(--bg-main);
+            border-radius: 8px;
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .order-code {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .order-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .order-date {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+
+        .order-amount {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <h1>Deki</h1>
+        </div>
+
+        <nav>
+            <a href="#" class="nav-item active" onclick="showView('dashboard')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Dashboard
+            </a>
+
+            <a href="#" class="nav-item" onclick="showView('customers')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                Khách hàng
+            </a>
+
+            <a href="#" class="nav-item" onclick="showView('reports')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <line x1="12" y1="20" x2="12" y2="10"></line>
+                    <line x1="18" y1="20" x2="18" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="16"></line>
+                </svg>
+                Báo cáo
+            </a>
+
+            <a href="#" class="nav-item" onclick="showView('filters')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                Lọc khách hàng
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Dashboard View -->
+        <div id="dashboard-view">
+            <div class="header">
+                <div>
+                    <h2>Dashboard</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Tổng quan hoạt động kinh doanh</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Xuất Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statTotalCustomers">0</div>
+                            <div class="stat-label">Tổng khách hàng</div>
+                            <div class="stat-trend" id="trendCustomers"></div>
+                        </div>
+                        <div class="stat-icon primary">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statTotalOrders">0</div>
+                            <div class="stat-label">Tổng đơn hàng</div>
+                            <div class="stat-trend" id="trendOrders"></div>
+                        </div>
+                        <div class="stat-icon success">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statTotalRevenue">0</div>
+                            <div class="stat-label">Tổng doanh thu</div>
+                            <div class="stat-trend" id="trendRevenue"></div>
+                        </div>
+                        <div class="stat-icon warning">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statAvgPerCustomer">0</div>
+                            <div class="stat-label">Giá trị TB/Khách</div>
+                            <div class="stat-trend" id="trendAvg"></div>
+                        </div>
+                        <div class="stat-icon secondary">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Doanh thu theo thời gian</h3>
+                        <div class="view-toggle">
+                            <button class="view-btn active" onclick="updateRevenueChart('week')">Tuần</button>
+                            <button class="view-btn" onclick="updateRevenueChart('month')">Tháng</button>
+                            <button class="view-btn" onclick="updateRevenueChart('year')">Năm</button>
+                        </div>
+                    </div>
+                    <canvas id="revenueChart" style="max-height: 300px;"></canvas>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Phân nhóm khách hàng</h3>
+                    </div>
+                    <canvas id="segmentChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card" style="margin-top: 20px;">
+                <div class="chart-header">
+                    <h3 class="chart-title">Top 10 Website theo đơn hàng</h3>
+                </div>
+                <canvas id="websiteChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Customers View -->
+        <div id="customers-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Danh sách khách hàng</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">902 khách hàng</p>
+                </div>
+                <div class="header-actions">
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
+                    <button class="btn btn-secondary" onclick="resetData()" title="Xóa toàn bộ dữ liệu đã upload">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                        </svg>
+                        Xóa dữ liệu
+                    </button>
+                    <button class="btn btn-primary" onclick="document.getElementById('excelFileInput').click()">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Cập nhật từ Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <div class="filters-row">
+                    <div class="search-box">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="searchInput" placeholder="Tìm kiếm theo tên khách hàng...">
+                    </div>
+
+                    <select class="filter-select" id="segmentFilter">
+                        <option value="">Tất cả phân nhóm</option>
+                        <option value="Sỉ vừa">Sỉ vừa</option>
+                        <option value="Khách Lẻ">Khách Lẻ</option>
+                        <option value="CTV">CTV</option>
+                        <option value="Sỉ to">Sỉ to</option>
+                        <option value="Sỉ nhỏ">Sỉ nhỏ</option>
+                    </select>
+
+                    <select class="filter-select" id="websiteFilter">
+                        <option value="">Tất cả website</option>
+                    </select>
+
+                    <select class="filter-select" id="employeeFilter">
+                        <option value="">Tất cả nhân viên</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Khách hàng</th>
+                            <th>Phân nhóm</th>
+                            <th>Brand</th>
+                            <th>Nhân viên</th>
+                            <th>Số đơn</th>
+                            <th>Doanh thu</th>
+                            <th>Website</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customers-table-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: var(--text-gray); font-size: 14px;" id="paginationInfo">
+                    Hiển thị 1-10 trong tổng số 0 khách hàng
+                </div>
+                <div style="display: flex; gap: 8px;" id="paginationControls">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports View -->
+        <div id="reports-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Báo cáo & Phân tích</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;" id="reportPeriodLabel">Tất cả thời gian</p>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" onclick="updateReportPeriod('all')">Tất cả</button>
+                    <button class="view-btn" onclick="updateReportPeriod('week')">Tuần</button>
+                    <button class="view-btn" onclick="updateReportPeriod('month')">Tháng</button>
+                    <button class="view-btn" onclick="updateReportPeriod('year')">Năm</button>
+                    <button class="view-btn" onclick="updateReportPeriod('custom')">Tùy chọn</button>
+                </div>
+            </div>
+
+            <!-- Custom date range -->
+            <div id="customDateRange" style="display: none; background: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-gray);">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <label style="font-weight: 500;">Từ:</label>
+                    <input type="date" id="reportDateFrom" class="filter-select">
+                    <label style="font-weight: 500;">Đến:</label>
+                    <input type="date" id="reportDateTo" class="filter-select">
+                    <button class="btn btn-primary" onclick="applyCustomDateRange()">Áp dụng</button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Top 10 Website</h3>
+                    </div>
+                    <div style="padding: 16px 0;" id="reportTopWebsites">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Phân nhóm khách hàng</h3>
+                    </div>
+                    <div style="padding: 16px 0;" id="reportSegments">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top 10 Khách hàng (full width) -->
+            <div class="chart-card" style="margin-top: 20px;">
+                <div class="chart-header">
+                    <h3 class="chart-title">Top 10 Khách hàng theo doanh thu</h3>
+                </div>
+                <div style="padding: 16px 0;" id="reportTopCustomers">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters View -->
+        <div id="filters-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Lọc khách hàng quan tâm</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Kết hợp nhiều tiêu chí để tìm nhóm khách hàng phù hợp</p>
+                </div>
+            </div>
+
+            <div class="filters" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 16px; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary);">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    Bộ lọc
+                </h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Website</label>
+                        <select class="filter-select" id="advWebsiteFilter" style="width: 100%;">
+                            <option value="">Tất cả website</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Brand</label>
+                        <select class="filter-select" id="advBrandFilter" style="width: 100%;">
+                            <option value="">Tất cả brand</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Phân nhóm</label>
+                        <select class="filter-select" id="advSegmentFilter" style="width: 100%;">
+                            <option value="">Tất cả phân nhóm</option>
+                            <option value="Sỉ vừa">Sỉ vừa</option>
+                            <option value="Khách Lẻ">Khách Lẻ</option>
+                            <option value="CTV">CTV</option>
+                            <option value="Sỉ to">Sỉ to</option>
+                            <option value="Sỉ nhỏ">Sỉ nhỏ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Nhân viên phụ trách</label>
+                        <select class="filter-select" id="advEmployeeFilter" style="width: 100%;">
+                            <option value="">Tất cả nhân viên</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Số đơn tối thiểu</label>
+                        <input type="number" class="filter-select" id="advMinOrders" style="width: 100%;" placeholder="VD: 10" min="0">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Số đơn tối đa</label>
+                        <input type="number" class="filter-select" id="advMaxOrders" style="width: 100%;" placeholder="Không giới hạn" min="0">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Doanh thu tối thiểu (đ)</label>
+                        <input type="number" class="filter-select" id="advMinRevenue" style="width: 100%;" placeholder="VD: 10000000" min="0">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Doanh thu tối đa (đ)</label>
+                        <input type="number" class="filter-select" id="advMaxRevenue" style="width: 100%;" placeholder="Không giới hạn" min="0">
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <button class="btn btn-secondary" onclick="clearAdvancedFilters()">Xóa bộ lọc</button>
+                    <button class="btn btn-primary" onclick="applyAdvancedFilters()">Áp dụng lọc</button>
+                </div>
+            </div>
+
+            <!-- Kết quả -->
+            <div id="advResultContainer" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="font-size: 16px;">Kết quả: <span id="advResultCount" style="color: var(--primary);">0</span> khách hàng</h3>
+                    <button class="btn btn-secondary" onclick="exportFilteredToExcel()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Xuất Excel
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Khách hàng</th>
+                                <th>Phân nhóm</th>
+                                <th>Brand</th>
+                                <th>Nhân viên</th>
+                                <th>Số đơn</th>
+                                <th>Doanh thu</th>
+                                <th>Website</th>
+                            </tr>
+                        </thead>
+                        <tbody id="advResultTableBody"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: var(--text-gray); font-size: 14px;" id="advPaginationInfo"></div>
+                    <div style="display: flex; gap: 8px;" id="advPaginationControls"></div>
+                </div>
+            </div>
+
+            <div id="advEmptyState" class="table-container">
+                <div style="padding: 64px; text-align: center; color: var(--text-light);">
+                    <svg width="64" height="64" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto 16px;">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    <p>Chọn các tiêu chí ở trên và click <strong>"Áp dụng lọc"</strong> để xem danh sách khách hàng</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showView(viewName) {
+            // Hide all views
+            document.getElementById('dashboard-view').classList.add('section-hidden');
+            document.getElementById('customers-view').classList.add('section-hidden');
+            document.getElementById('reports-view').classList.add('section-hidden');
+            document.getElementById('filters-view').classList.add('section-hidden');
+
+            // Show selected view
+            document.getElementById(viewName + '-view').classList.remove('section-hidden');
+
+            // Update active nav
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item').classList.add('active');
+        }
+
+        let currentModalCustomer = null;
+
+        function showCustomerDetail(name) {
+            const customer = allCustomers.find(c => c.name === name);
+            if (!customer) return;
+
+            currentModalCustomer = customer;
+
+            // Populate header
+            document.getElementById('modalCustomerName').textContent = customer.name;
+
+            // Segment badge với màu tương ứng
+            const segmentBadge = document.getElementById('modalSegment');
+            const segmentClass = removeDiacritics(customer.segment).toLowerCase().replace(/\s+/g, '-');
+            segmentBadge.textContent = customer.segment;
+            segmentBadge.className = 'badge ' + segmentClass;
+
+            // Nhân viên phụ trách (filter bỏ EXCLUDED_EMPLOYEES)
+            const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
+            document.getElementById('modalEmployees').textContent = employees.length > 0 ? employees.join(', ') : 'Chưa có';
+
+            // Populate month filter dropdown từ monthlyData
+            const monthFilter = document.getElementById('modalMonthFilter');
+            const months = Object.keys(customer.monthlyData || {}).sort().reverse();
+            monthFilter.innerHTML = '<option value="all">Tất cả thời gian</option>' +
+                months.map(m => {
+                    const [y, mm] = m.split('-');
+                    return `<option value="${m}">Tháng ${parseInt(mm)}/${y}</option>`;
+                }).join('');
+            monthFilter.value = 'all';
+
+            // Render stats + websites + orders theo filter mặc định (all)
+            renderModalStats();
+
+            // Show modal
+            document.getElementById('customerModal').classList.add('active');
+        }
+
+        function closeCustomerModal() {
+            document.getElementById('customerModal').classList.remove('active');
+        }
+
+        // Filter allOrders theo tháng được chọn trong modal customer
+        function getFilteredCustomerOrders(customer) {
+            const selectedMonth = document.getElementById('modalMonthFilter')?.value || 'all';
+            const orders = customer.allOrders || [];
+            if (selectedMonth === 'all') return orders;
+            return orders.filter(o => {
+                const dayKey = parseDateToDay(o.date);
+                return dayKey && dayKey.substring(0, 7) === selectedMonth;
+            });
+        }
+
+        function getSelectedMonthLabel() {
+            const selected = document.getElementById('modalMonthFilter')?.value;
+            if (!selected || selected === 'all') return '';
+            const [y, m] = selected.split('-');
+            return `Tháng ${parseInt(m)}/${y}`;
+        }
+
+        // ===== ALL ORDERS MODAL =====
+        let allOrdersCurrentPage = 1;
+        const allOrdersPerPage = 10;
+
+        function showAllOrdersModal() {
+            if (!currentModalCustomer) return;
+            allOrdersCurrentPage = 1;
+            document.getElementById('allOrdersModal').classList.add('active');
+            renderAllOrdersList();
+        }
+
+        function closeAllOrdersModal() {
+            document.getElementById('allOrdersModal').classList.remove('active');
+        }
+
+        function renderAllOrdersList() {
+            const customer = currentModalCustomer;
+            if (!customer) return;
+
+            const filteredOrders = getFilteredCustomerOrders(customer);
+            const sorted = [...filteredOrders].sort((a, b) => {
+                const da = parseDateToDay(a.date) || '';
+                const db = parseDateToDay(b.date) || '';
+                return db.localeCompare(da);
+            });
+
+            // Update header count + filter label
+            const monthLabel = getSelectedMonthLabel();
+            const filterText = monthLabel ? ` - ${monthLabel}` : '';
+            document.getElementById('allOrdersCount').textContent = `(${sorted.length} đơn hàng${filterText})`;
+
+            const list = document.getElementById('allOrdersList');
+
+            if (sorted.length === 0) {
+                list.innerHTML = '<div style="text-align: center; padding: 48px; color: var(--text-light);">Chưa có dữ liệu chi tiết đơn hàng.<br>Vui lòng upload lại file Excel để xem chi tiết.</div>';
+                document.getElementById('allOrdersPaginationInfo').textContent = '';
+                document.getElementById('allOrdersPaginationControls').innerHTML = '';
+                return;
+            }
+
+            // Pagination slice
+            const startIdx = (allOrdersCurrentPage - 1) * allOrdersPerPage;
+            const endIdx = startIdx + allOrdersPerPage;
+            const pageOrders = sorted.slice(startIdx, endIdx);
+
+            list.innerHTML = pageOrders.map(order => `
+                <div class="order-item">
+                    <span class="order-code">${order.code || '-'}</span>
+                    <div class="order-info">
+                        <div>${order.website || '-'}</div>
+                        <div class="order-date">${order.date || '-'}</div>
+                    </div>
+                    <span class="order-amount">${order.amount.toLocaleString('vi-VN')} đ</span>
+                    <span class="badge khach-le" style="font-size: 12px;">${order.brand || '-'}</span>
+                </div>
+            `).join('');
+
+            // Pagination info
+            const startNum = startIdx + 1;
+            const endNum = Math.min(endIdx, sorted.length);
+            document.getElementById('allOrdersPaginationInfo').textContent =
+                `Hiển thị ${startNum}-${endNum} trong ${sorted.length} đơn`;
+
+            // Pagination controls
+            const totalPages = Math.ceil(sorted.length / allOrdersPerPage);
+            const controls = document.getElementById('allOrdersPaginationControls');
+            let html = '';
+
+            const prevDisabled = allOrdersCurrentPage === 1 ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${prevDisabled} onclick="goToAllOrdersPage(${allOrdersCurrentPage - 1})">Trước</button>`;
+
+            const pagesToShow = [];
+            if (totalPages <= 5) {
+                for (let i = 1; i <= totalPages; i++) pagesToShow.push(i);
+            } else {
+                pagesToShow.push(1);
+                if (allOrdersCurrentPage > 3) pagesToShow.push('...');
+                const start = Math.max(2, allOrdersCurrentPage - 1);
+                const end = Math.min(totalPages - 1, allOrdersCurrentPage + 1);
+                for (let i = start; i <= end; i++) pagesToShow.push(i);
+                if (allOrdersCurrentPage < totalPages - 2) pagesToShow.push('...');
+                pagesToShow.push(totalPages);
+            }
+
+            pagesToShow.forEach(page => {
+                if (page === '...') {
+                    html += `<span style="padding: 8px 4px; color: var(--text-light);">...</span>`;
+                } else {
+                    const btnClass = page === allOrdersCurrentPage ? 'btn-primary' : 'btn-secondary';
+                    html += `<button class="btn ${btnClass}" style="padding: 8px 16px;" onclick="goToAllOrdersPage(${page})">${page}</button>`;
+                }
+            });
+
+            const nextDisabled = allOrdersCurrentPage === totalPages ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${nextDisabled} onclick="goToAllOrdersPage(${allOrdersCurrentPage + 1})">Sau</button>`;
+
+            controls.innerHTML = html;
+        }
+
+        function goToAllOrdersPage(page) {
+            const sorted = getFilteredCustomerOrders(currentModalCustomer);
+            const totalPages = Math.ceil(sorted.length / allOrdersPerPage);
+            if (page < 1 || page > totalPages) return;
+            allOrdersCurrentPage = page;
+            renderAllOrdersList();
+        }
+
+        // ===== ALL WEBSITES MODAL =====
+        function showAllWebsitesModal() {
+            if (!currentModalCustomer) return;
+            document.getElementById('allWebsitesModal').classList.add('active');
+            renderAllWebsitesList();
+        }
+
+        function closeAllWebsitesModal() {
+            document.getElementById('allWebsitesModal').classList.remove('active');
+        }
+
+        function renderAllWebsitesList() {
+            const customer = currentModalCustomer;
+            if (!customer) return;
+
+            const filteredOrders = getFilteredCustomerOrders(customer);
+
+            // Tính websites từ filtered orders (chỉ websites có order trong tháng đã chọn)
+            const websiteStats = {};
+            filteredOrders.forEach(o => {
+                if (!o.website || o.website === 'N/A') return;
+                if (!websiteStats[o.website]) {
+                    websiteStats[o.website] = { orders: 0, revenue: 0 };
+                }
+                websiteStats[o.website].orders += 1;
+                websiteStats[o.website].revenue += (o.amount || 0);
+            });
+
+            // Sort by revenue desc
+            const sorted = Object.entries(websiteStats).map(([name, stats]) => ({
+                name,
+                orders: stats.orders,
+                revenue: stats.revenue
+            })).sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name));
+
+            const monthLabel = getSelectedMonthLabel();
+            const filterText = monthLabel ? ` - ${monthLabel}` : '';
+            document.getElementById('allWebsitesCount').textContent = `(${sorted.length} websites${filterText})`;
+
+            const list = document.getElementById('allWebsitesList');
+
+            if (sorted.length === 0) {
+                list.innerHTML = '<div style="text-align: center; padding: 48px; color: var(--text-light);">Khách hàng chưa có website nào</div>';
+                return;
+            }
+
+            list.innerHTML = sorted.map((w, i) => {
+                const hasStats = w.orders > 0;
+                return `
+                    <div class="order-item">
+                        <span style="display: flex; align-items: center; gap: 10px;">
+                            <span style="color: var(--text-light); font-weight: 500; min-width: 24px;">${i + 1}.</span>
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary);">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                            <span style="font-weight: 500;">${w.name}</span>
+                        </span>
+                        <div class="order-info">
+                            <div style="color: var(--text-gray); font-size: 13px;">${hasStats ? w.orders + ' đơn' : ''}</div>
+                        </div>
+                        <span class="order-amount">${hasStats ? w.revenue.toLocaleString('vi-VN') + ' đ' : '-'}</span>
+                        <span></span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render stats trong modal theo filter tháng
+        function renderModalStats() {
+            const customer = currentModalCustomer;
+            if (!customer) return;
+
+            const selected = document.getElementById('modalMonthFilter').value;
+            let orders, revenue, ordersTrend = null, revenueTrend = null;
+
+            if (selected === 'all') {
+                // Tổng tất cả
+                orders = customer.orders;
+                revenue = customer.revenue;
+            } else {
+                // Theo tháng cụ thể
+                const monthData = (customer.monthlyData || {})[selected] || { orders: 0, revenue: 0 };
+                orders = monthData.orders;
+                revenue = monthData.revenue;
+
+                // Tính tháng trước cho so sánh
+                const [y, m] = selected.split('-').map(Number);
+                const prevDate = new Date(y, m - 2, 1);
+                const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+                const prevData = (customer.monthlyData || {})[prevMonth];
+
+                if (prevData) {
+                    const pctChange = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
+                    ordersTrend = pctChange(orders, prevData.orders);
+                    revenueTrend = pctChange(revenue, prevData.revenue);
+                }
+            }
+
+            const avgOrder = orders > 0 ? revenue / orders : 0;
+
+            // Tính websites + orders theo filter để hiển thị section dưới
+            const filteredOrders = getFilteredCustomerOrders(customer);
+            let websitesInPeriod;
+            if (selected === 'all') {
+                websitesInPeriod = (customer.websites || []).filter(w => w && w !== 'N/A');
+            } else {
+                const websiteSet = new Set();
+                filteredOrders.forEach(o => {
+                    if (o.website && o.website !== 'N/A') websiteSet.add(o.website);
+                });
+                websitesInPeriod = Array.from(websiteSet);
+            }
+
+            // Render values
+            document.getElementById('modalOrders').textContent = orders.toLocaleString('vi-VN');
+            document.getElementById('modalRevenue').textContent = revenue >= 1e9
+                ? (revenue / 1e9).toFixed(2) + ' tỷ'
+                : (revenue / 1e6).toFixed(1) + ' triệu';
+            document.getElementById('modalAvgOrder').textContent = avgOrder > 0
+                ? (avgOrder / 1e6).toFixed(1) + 'M đ'
+                : '0';
+            document.getElementById('modalWebsites').textContent = websitesInPeriod.length;
+
+            // Render trends (chỉ khi có data tháng trước)
+            document.getElementById('modalOrdersTrend').innerHTML = renderTrend(ordersTrend);
+            document.getElementById('modalRevenueTrend').innerHTML = renderTrend(revenueTrend);
+
+            // Render Website chips (10 đầu tiên)
+            const websiteList = document.getElementById('modalWebsiteList');
+            websiteList.innerHTML = websitesInPeriod.slice(0, 10).map(website => `
+                <div class="website-chip">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    ${website}
+                </div>
+            `).join('');
+
+            // Render Đơn hàng gần đây (4 đơn mới nhất theo filter)
+            const orderList = document.getElementById('modalOrderList');
+            const sortedOrders = [...filteredOrders].sort((a, b) => {
+                const da = parseDateToDay(a.date) || '';
+                const db = parseDateToDay(b.date) || '';
+                return db.localeCompare(da);
+            });
+            const recentOrders = sortedOrders.slice(0, 4);
+
+            if (recentOrders.length === 0) {
+                orderList.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-light);">Không có đơn hàng trong khoảng thời gian này</div>';
+            } else {
+                orderList.innerHTML = recentOrders.map(order => `
+                    <div class="order-item">
+                        <span class="order-code">${order.code || '-'}</span>
+                        <div class="order-info">
+                            <div>${order.website || '-'}</div>
+                            <div class="order-date">${order.date || '-'}</div>
+                        </div>
+                        <span class="order-amount">${order.amount.toLocaleString('vi-VN')} đ</span>
+                        <span class="badge khach-le" style="font-size: 12px;">${order.brand || 'Hoàn thành'}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'customerModal') {
+                closeCustomerModal();
+            }
+            if (e.target.id === 'allOrdersModal') {
+                closeAllOrdersModal();
+            }
+            if (e.target.id === 'allWebsitesModal') {
+                closeAllWebsitesModal();
+            }
+        });
+
+        // Data từ phân tích DS_DONHANG.xlsx
+        const segmentData = {
+            labels: ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'],
+            data: [10826984983, 3928883968, 3831219679, 1088911606, 84366936],
+            counts: [212, 508, 169, 11, 2]
+        };
+
+        const websiteData = {
+            labels: ['macys.com', 'usa.tommy.com', 'lacoste.com', 'amazon.com', 'ebay.com',
+                     'sephora.com', 'calvinklein.us', 'us.puma.com', 'jomashop.com', 'belk.com'],
+            orders: [1708, 858, 588, 450, 251, 244, 194, 191, 176, 169],
+            revenue: [5691860600, 1531483331, 1728918511, 1458111863, 1252776256,
+                      768157686, 263456974, 326624908, 547025035, 289456123]
+        };
+
+        // Tính revenue dataset cho chart từ allCustomers (week / month / year)
+        function getRevenueData(period) {
+            // Gom dailyData từ tất cả customers
+            const dailyTotal = {}; // { 'YYYY-MM-DD': revenue }
+            const monthlyTotal = {}; // { 'YYYY-MM': revenue }
+
+            allCustomers.forEach(customer => {
+                Object.entries(customer.dailyData || {}).forEach(([day, data]) => {
+                    dailyTotal[day] = (dailyTotal[day] || 0) + data.revenue;
+                });
+                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
+                    monthlyTotal[month] = (monthlyTotal[month] || 0) + data.revenue;
+                });
+            });
+
+            const dailyKeys = Object.keys(dailyTotal).sort();
+            const monthlyKeys = Object.keys(monthlyTotal).sort();
+
+            // Helper: thêm/trừ ngày từ "YYYY-MM-DD"
+            const addDays = (dayStr, days) => {
+                const [y, m, d] = dayStr.split('-').map(Number);
+                const dt = new Date(y, m - 1, d);
+                dt.setDate(dt.getDate() + days);
+                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            };
+
+            const formatDDMM = (dayStr) => {
+                const [y, m, d] = dayStr.split('-');
+                return `${d}/${m}`;
+            };
+
+            const formatMMYY = (monthStr) => {
+                const [y, m] = monthStr.split('-');
+                return `T${parseInt(m)}/${y.slice(2)}`;
+            };
+
+            if (period === 'week') {
+                // 7 ngày gần nhất (tính từ ngày cuối có data)
+                if (dailyKeys.length === 0) return { labels: [], data: [] };
+                const lastDay = dailyKeys[dailyKeys.length - 1];
+                const labels = [];
+                const data = [];
+                for (let i = 6; i >= 0; i--) {
+                    const day = addDays(lastDay, -i);
+                    labels.push(formatDDMM(day));
+                    data.push(Math.round((dailyTotal[day] || 0) / 1e6 * 10) / 10);
+                }
+                return { labels, data };
+            }
+
+            if (period === 'month') {
+                // 30 ngày gần nhất
+                if (dailyKeys.length === 0) return { labels: [], data: [] };
+                const lastDay = dailyKeys[dailyKeys.length - 1];
+                const labels = [];
+                const data = [];
+                for (let i = 29; i >= 0; i--) {
+                    const day = addDays(lastDay, -i);
+                    labels.push(formatDDMM(day));
+                    data.push(Math.round((dailyTotal[day] || 0) / 1e6 * 10) / 10);
+                }
+                return { labels, data };
+            }
+
+            if (period === 'year') {
+                // 12 tháng gần nhất
+                if (monthlyKeys.length === 0) return { labels: [], data: [] };
+                const lastMonth = monthlyKeys[monthlyKeys.length - 1];
+                const [y, m] = lastMonth.split('-').map(Number);
+                const labels = [];
+                const data = [];
+                for (let i = 11; i >= 0; i--) {
+                    const dt = new Date(y, m - 1 - i, 1);
+                    const monthKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+                    labels.push(formatMMYY(monthKey));
+                    data.push(Math.round((monthlyTotal[monthKey] || 0) / 1e6));
+                }
+                return { labels, data };
+            }
+
+            return { labels: [], data: [] };
+        }
+
+        // Chart 1: Doanh thu theo thời gian (Line Chart)
+        // Init với data rỗng, sẽ được update bởi refreshRevenueChart() sau khi allCustomers ready
+        let revenueChart;
+        const revenueCtx = document.getElementById('revenueChart');
+        if (revenueCtx) {
+            revenueChart = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Doanh thu (triệu đ)',
+                        data: [],
+                        borderColor: '#00BCD4',
+                        backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#00BCD4'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#003D5C',
+                            padding: 12,
+                            titleColor: '#00BCD4',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Doanh thu: ' + context.parsed.y.toLocaleString('vi-VN') + ' triệu đ';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('vi-VN');
+                                }
+                            },
+                            grid: {
+                                color: '#E5E7EB'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Phân nhóm khách hàng (Pie Chart)
+        const segmentCtx = document.getElementById('segmentChart');
+        if (segmentCtx) {
+            new Chart(segmentCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: segmentData.labels,
+                    datasets: [{
+                        data: segmentData.data,
+                        backgroundColor: [
+                            '#00BCD4',
+                            '#10B981',
+                            '#FFB84D',
+                            '#8B5CF6',
+                            '#EC4899'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                font: {
+                                    size: 12
+                                },
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    return data.labels.map((label, i) => ({
+                                        text: label + ' (' + segmentData.counts[i] + ' khách)',
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        hidden: false,
+                                        index: i
+                                    }));
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#003D5C',
+                            padding: 12,
+                            titleColor: '#00BCD4',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percent = ((value / total) * 100).toFixed(1);
+                                    return [
+                                        'Doanh thu: ' + (value / 1000000000).toFixed(1) + ' tỷ',
+                                        'Tỷ lệ: ' + percent + '%'
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 3: Top 10 Website (Bar Chart)
+        const websiteCtx = document.getElementById('websiteChart');
+        if (websiteCtx) {
+            new Chart(websiteCtx, {
+                type: 'bar',
+                data: {
+                    labels: websiteData.labels,
+                    datasets: [{
+                        label: 'Số đơn hàng',
+                        data: websiteData.orders,
+                        backgroundColor: '#00BCD4',
+                        borderRadius: 6,
+                        barThickness: 40
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#003D5C',
+                            padding: 12,
+                            titleColor: '#00BCD4',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                label: function(context) {
+                                    const revenue = websiteData.revenue[context.dataIndex];
+                                    return [
+                                        'Đơn hàng: ' + context.parsed.x.toLocaleString('vi-VN'),
+                                        'Doanh thu: ' + (revenue / 1000000).toLocaleString('vi-VN') + ' triệu đ'
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#E5E7EB'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('vi-VN');
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function để update Revenue Chart khi switch giữa Tuần/Tháng/Năm
+        function updateRevenueChart(period) {
+            if (!revenueChart) return;
+
+            // Update active button
+            document.querySelectorAll('.view-toggle .view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update chart data
+            const dataset = getRevenueData(period);
+            revenueChart.data.labels = dataset.labels;
+            revenueChart.data.datasets[0].data = dataset.data;
+            revenueChart.update('active');
+        }
+
+        // Refresh chart sau khi upload data mới
+        function refreshRevenueChart() {
+            if (!revenueChart) return;
+            // Lấy period đang active từ button
+            const activeBtn = document.querySelector('.view-toggle .view-btn.active');
+            const periodMap = { 'Tuần': 'week', 'Tháng': 'month', 'Năm': 'year' };
+            const period = activeBtn ? (periodMap[activeBtn.textContent.trim()] || 'week') : 'week';
+            const dataset = getRevenueData(period);
+            revenueChart.data.labels = dataset.labels;
+            revenueChart.data.datasets[0].data = dataset.data;
+            revenueChart.update();
+        }
+
+        // ===== CUSTOMER DATA =====
+        // Data sẽ được load từ localStorage hoặc từ Excel upload
+        const allCustomers = [];
+
+        // Danh sách nhân viên không hiển thị (lowercase)
+        const EXCLUDED_EMPLOYEES = [];
+
+        // Helper: bỏ dấu tiếng Việt
+        function removeDiacritics(str) {
+            return str.normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+        }
+
+        // ===== LOCAL STORAGE PERSISTENCE =====
+        const STORAGE_KEY = 'deki_crm_customers';
+
+        // Sắp xếp khách hàng theo doanh thu giảm dần
+        function sortCustomersByRevenue() {
+            allCustomers.sort((a, b) => (b.revenue || 0) - (a.revenue || 0));
+        }
+
+        // Load saved data từ localStorage (nếu có)
+        function loadCustomersFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) return false;
+
+                const data = JSON.parse(saved);
+                if (!Array.isArray(data) || data.length === 0) return false;
+
+                // Replace toàn bộ allCustomers bằng data đã lưu
+                allCustomers.splice(0, allCustomers.length, ...data);
+                return true;
+            } catch (err) {
+                console.error('Lỗi load data từ storage:', err);
+                return false;
+            }
+        }
+
+        // Lưu allCustomers vào localStorage
+        function saveCustomersToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(allCustomers));
+            } catch (err) {
+                console.error('Lỗi save data:', err);
+                showToast('error', 'Lỗi lưu dữ liệu', 'Dung lượng vượt giới hạn localStorage');
+            }
+        }
+
+        // Xóa toàn bộ dữ liệu (localStorage + memory)
+        function resetData() {
+            if (!confirm('Xóa toàn bộ dữ liệu khách hàng đã upload? Hành động này không thể hoàn tác.')) return;
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+
+        let filteredCustomers = [...allCustomers];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+
+        // Populate website filter với unique websites
+        function populateWebsiteFilter() {
+            const allWebsites = new Set();
+            allCustomers.forEach(c => c.websites.forEach(w => allWebsites.add(w)));
+            const sortedWebsites = Array.from(allWebsites).filter(w => w !== 'N/A').sort();
+
+            const select = document.getElementById('websiteFilter');
+            sortedWebsites.forEach(website => {
+                const option = document.createElement('option');
+                option.value = website;
+                option.textContent = website;
+                select.appendChild(option);
+            });
+        }
+
+        function populateEmployeeFilter() {
+            const allEmployees = new Set();
+            allCustomers.forEach(c => (c.employees || []).forEach(e => {
+                if (e && !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())) {
+                    allEmployees.add(e);
+                }
+            }));
+            const sortedEmployees = Array.from(allEmployees).sort();
+
+            const select = document.getElementById('employeeFilter');
+            sortedEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee;
+                option.textContent = employee;
+                select.appendChild(option);
+            });
+        }
+
+        function repopulateEmployeeFilter() {
+            const select = document.getElementById('employeeFilter');
+            const currentValue = select.value;
+            while (select.options.length > 1) select.remove(1);
+
+            const allEmployees = new Set();
+            allCustomers.forEach(c => (c.employees || []).forEach(e => {
+                if (e && !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())) {
+                    allEmployees.add(e);
+                }
+            }));
+            Array.from(allEmployees).sort().forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee;
+                option.textContent = employee;
+                select.appendChild(option);
+            });
+
+            select.value = currentValue;
+        }
+
+        // Render customer table với pagination
+        function renderCustomerTable(customers) {
+            const tbody = document.getElementById('customers-table-body');
+            if (!tbody) return;
+
+            if (customers.length === 0) {
+                const hasAnyData = allCustomers.length > 0;
+                const message = hasAnyData
+                    ? 'Không tìm thấy khách hàng phù hợp với bộ lọc'
+                    : 'Chưa có dữ liệu. Vui lòng click <strong>"Cập nhật từ Excel"</strong> để upload file DS_DONHANG.xlsx';
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 48px; color: var(--text-light);">${message}</td></tr>`;
+                renderPagination(0);
+                return;
+            }
+
+            // Pagination slice
+            const startIdx = (currentPage - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const pageCustomers = customers.slice(startIdx, endIdx);
+
+            tbody.innerHTML = pageCustomers.map(customer => {
+                const segmentClass = customer.segment
+                    .normalize('NFD')
+                    .replace(/[̀-ͯ]/g, '')
+                    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+                    .toLowerCase()
+                    .replace(/\s+/g, '-');
+
+                const brandsText = (customer.brands || []).join(', ') || '-';
+                const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
+                const employeesText = employees.length === 0 ? '-'
+                    : employees.length === 1 ? employees[0]
+                    : `${employees[0]} +${employees.length - 1}`;
+
+                return `
+                    <tr onclick="showCustomerDetail('${customer.name}')">
+                        <td class="customer-name">${customer.name}</td>
+                        <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
+                        <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
+                        <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
+                        <td>${customer.orders}</td>
+                        <td>${customer.revenue.toLocaleString('vi-VN')} đ</td>
+                        <td class="websites-tag">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                            ${customer.websites.length} websites
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            renderPagination(customers.length);
+        }
+
+        // Render pagination controls
+        function renderPagination(totalItems) {
+            const info = document.getElementById('paginationInfo');
+            const controls = document.getElementById('paginationControls');
+            if (!info || !controls) return;
+
+            if (totalItems === 0) {
+                info.textContent = 'Không có khách hàng';
+                controls.innerHTML = '';
+                return;
+            }
+
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const startIdx = (currentPage - 1) * itemsPerPage + 1;
+            const endIdx = Math.min(currentPage * itemsPerPage, totalItems);
+
+            info.textContent = `Hiển thị ${startIdx}-${endIdx} trong tổng số ${totalItems} khách hàng`;
+
+            // Build page buttons (max 7 visible: prev, 1, ..., curr-1, curr, curr+1, ..., last, next)
+            let html = '';
+            const prevDisabled = currentPage === 1 ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${prevDisabled} onclick="goToPage(${currentPage - 1})">Trước</button>`;
+
+            const pagesToShow = [];
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pagesToShow.push(i);
+            } else {
+                pagesToShow.push(1);
+                if (currentPage > 3) pagesToShow.push('...');
+                const start = Math.max(2, currentPage - 1);
+                const end = Math.min(totalPages - 1, currentPage + 1);
+                for (let i = start; i <= end; i++) pagesToShow.push(i);
+                if (currentPage < totalPages - 2) pagesToShow.push('...');
+                pagesToShow.push(totalPages);
+            }
+
+            pagesToShow.forEach(page => {
+                if (page === '...') {
+                    html += `<span style="padding: 8px 4px; color: var(--text-light);">...</span>`;
+                } else {
+                    const btnClass = page === currentPage ? 'btn-primary' : 'btn-secondary';
+                    html += `<button class="btn ${btnClass}" style="padding: 8px 16px;" onclick="goToPage(${page})">${page}</button>`;
+                }
+            });
+
+            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${nextDisabled} onclick="goToPage(${currentPage + 1})">Sau</button>`;
+
+            controls.innerHTML = html;
+        }
+
+        // Navigate to page
+        function goToPage(page) {
+            const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            renderCustomerTable(filteredCustomers);
+            // Scroll lên đầu table
+            document.querySelector('#customers-view .table-container')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ===== ADVANCED FILTERS (Lọc khách hàng quan tâm) =====
+        let advFilteredCustomers = [];
+        let advCurrentPage = 1;
+        const advPerPage = 10;
+
+        function populateAdvancedFilterDropdowns() {
+            // Websites
+            const websites = new Set();
+            const brands = new Set();
+            const employees = new Set();
+            allCustomers.forEach(c => {
+                (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); });
+                (c.brands || []).forEach(b => { if (b) brands.add(b); });
+                (c.employees || []).forEach(e => {
+                    if (e && !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())) employees.add(e);
+                });
+            });
+
+            const fillSelect = (id, items, allLabel) => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const currentValue = sel.value;
+                sel.innerHTML = `<option value="">${allLabel}</option>` +
+                    Array.from(items).sort().map(v => `<option value="${v}">${v}</option>`).join('');
+                sel.value = currentValue;
+            };
+
+            fillSelect('advWebsiteFilter', websites, 'Tất cả website');
+            fillSelect('advBrandFilter', brands, 'Tất cả brand');
+            fillSelect('advEmployeeFilter', employees, 'Tất cả nhân viên');
+        }
+
+        function clearAdvancedFilters() {
+            document.getElementById('advWebsiteFilter').value = '';
+            document.getElementById('advBrandFilter').value = '';
+            document.getElementById('advSegmentFilter').value = '';
+            document.getElementById('advEmployeeFilter').value = '';
+            document.getElementById('advMinOrders').value = '';
+            document.getElementById('advMaxOrders').value = '';
+            document.getElementById('advMinRevenue').value = '';
+            document.getElementById('advMaxRevenue').value = '';
+
+            document.getElementById('advResultContainer').style.display = 'none';
+            document.getElementById('advEmptyState').style.display = 'block';
+        }
+
+        function applyAdvancedFilters() {
+            const website = document.getElementById('advWebsiteFilter').value;
+            const brand = document.getElementById('advBrandFilter').value;
+            const segment = document.getElementById('advSegmentFilter').value;
+            const employee = document.getElementById('advEmployeeFilter').value;
+            const minOrders = parseInt(document.getElementById('advMinOrders').value) || 0;
+            const maxOrders = parseInt(document.getElementById('advMaxOrders').value) || Infinity;
+            const minRevenue = parseFloat(document.getElementById('advMinRevenue').value) || 0;
+            const maxRevenue = parseFloat(document.getElementById('advMaxRevenue').value) || Infinity;
+
+            advFilteredCustomers = allCustomers.filter(c => {
+                if (website && !(c.websites || []).includes(website)) return false;
+                if (brand && !(c.brands || []).includes(brand)) return false;
+                if (segment && c.segment !== segment) return false;
+                if (employee && !(c.employees || []).includes(employee)) return false;
+                if (c.orders < minOrders || c.orders > maxOrders) return false;
+                if (c.revenue < minRevenue || c.revenue > maxRevenue) return false;
+                return true;
+            });
+
+            advCurrentPage = 1;
+            document.getElementById('advEmptyState').style.display = 'none';
+            document.getElementById('advResultContainer').style.display = 'block';
+            document.getElementById('advResultCount').textContent = advFilteredCustomers.length.toLocaleString('vi-VN');
+            renderAdvancedResults();
+        }
+
+        function renderAdvancedResults() {
+            const tbody = document.getElementById('advResultTableBody');
+            const startIdx = (advCurrentPage - 1) * advPerPage;
+            const endIdx = startIdx + advPerPage;
+            const pageCustomers = advFilteredCustomers.slice(startIdx, endIdx);
+
+            if (advFilteredCustomers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-light);">Không có khách hàng nào phù hợp với bộ lọc</td></tr>';
+                document.getElementById('advPaginationInfo').textContent = '';
+                document.getElementById('advPaginationControls').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = pageCustomers.map(c => {
+                const segmentClass = removeDiacritics(c.segment || '').toLowerCase().replace(/\s+/g, '-');
+                const employees = (c.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
+                const employeesText = employees.length === 0 ? '-'
+                    : employees.length === 1 ? employees[0]
+                    : `${employees[0]} +${employees.length - 1}`;
+                const brandsText = (c.brands || []).join(', ') || '-';
+
+                return `
+                    <tr onclick="showCustomerDetail('${c.name.replace(/'/g, "\\'")}')" style="cursor: pointer;">
+                        <td class="customer-name">${c.name}</td>
+                        <td><span class="badge ${segmentClass}">${c.segment || '-'}</span></td>
+                        <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
+                        <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
+                        <td>${c.orders.toLocaleString('vi-VN')}</td>
+                        <td>${c.revenue.toLocaleString('vi-VN')} đ</td>
+                        <td class="websites-tag">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                            </svg>
+                            ${(c.websites || []).length} websites
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Pagination
+            const totalPages = Math.ceil(advFilteredCustomers.length / advPerPage);
+            const startNum = startIdx + 1;
+            const endNum = Math.min(endIdx, advFilteredCustomers.length);
+            document.getElementById('advPaginationInfo').textContent =
+                `Hiển thị ${startNum}-${endNum} trong ${advFilteredCustomers.length} khách hàng`;
+
+            const controls = document.getElementById('advPaginationControls');
+            let html = '';
+            const prevDisabled = advCurrentPage === 1 ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${prevDisabled} onclick="goToAdvPage(${advCurrentPage - 1})">Trước</button>`;
+
+            const pages = [];
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                if (advCurrentPage > 3) pages.push('...');
+                const start = Math.max(2, advCurrentPage - 1);
+                const end = Math.min(totalPages - 1, advCurrentPage + 1);
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (advCurrentPage < totalPages - 2) pages.push('...');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding: 8px 4px; color: var(--text-light);">...</span>`;
+                } else {
+                    const cls = p === advCurrentPage ? 'btn-primary' : 'btn-secondary';
+                    html += `<button class="btn ${cls}" style="padding: 8px 16px;" onclick="goToAdvPage(${p})">${p}</button>`;
+                }
+            });
+            const nextDisabled = advCurrentPage === totalPages ? 'disabled' : '';
+            html += `<button class="btn btn-secondary" style="padding: 8px 12px;" ${nextDisabled} onclick="goToAdvPage(${advCurrentPage + 1})">Sau</button>`;
+            controls.innerHTML = html;
+        }
+
+        function goToAdvPage(page) {
+            const totalPages = Math.ceil(advFilteredCustomers.length / advPerPage);
+            if (page < 1 || page > totalPages) return;
+            advCurrentPage = page;
+            renderAdvancedResults();
+        }
+
+        // Export filtered customers ra file Excel
+        function exportFilteredToExcel() {
+            if (advFilteredCustomers.length === 0) {
+                showToast('error', 'Không có dữ liệu', 'Vui lòng áp dụng bộ lọc trước');
+                return;
+            }
+
+            const data = advFilteredCustomers.map(c => ({
+                'Tên khách hàng': c.name,
+                'Phân nhóm': c.segment || '',
+                'Brand': (c.brands || []).join(', '),
+                'Nhân viên': (c.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())).join(', '),
+                'Số đơn': c.orders,
+                'Doanh thu': c.revenue,
+                'Số website': (c.websites || []).length,
+                'Websites': (c.websites || []).join(', ')
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Khách hàng');
+            const filename = `Deki_KhachHang_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(wb, filename);
+            showToast('success', 'Xuất file thành công', `Đã tải ${data.length} khách hàng`);
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const rawSearch = document.getElementById('searchInput').value.trim();
+            const searchTerm = removeDiacritics(rawSearch).toLowerCase();
+            const segmentFilter = document.getElementById('segmentFilter').value;
+            const websiteFilter = document.getElementById('websiteFilter').value;
+            const employeeFilter = document.getElementById('employeeFilter').value;
+
+            filteredCustomers = allCustomers.filter(customer => {
+                // Search filter: tìm theo tên (bỏ dấu)
+                const nameNoDiacritics = removeDiacritics(customer.name).toLowerCase();
+                const matchSearch = !searchTerm || nameNoDiacritics.includes(searchTerm);
+
+                // Segment filter
+                const matchSegment = !segmentFilter || customer.segment === segmentFilter;
+
+                // Website filter
+                const matchWebsite = !websiteFilter || customer.websites.includes(websiteFilter);
+
+                // Employee filter
+                const matchEmployee = !employeeFilter || (customer.employees || []).includes(employeeFilter);
+
+                return matchSearch && matchSegment && matchWebsite && matchEmployee;
+            });
+
+            currentPage = 1;
+            renderCustomerTable(filteredCustomers);
+            updateCustomerCount();
+        }
+
+        // Update customer count
+        function updateCustomerCount() {
+            const countElement = document.querySelector('#customers-view .header p');
+            if (countElement) {
+                countElement.textContent = `${filteredCustomers.length} khách hàng`;
+            }
+        }
+
+        // ===== EXCEL UPLOAD FUNCTIONALITY =====
+
+        // Toast notification
+        let toastHideTimer = null;
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const titleEl = document.getElementById('toastTitle');
+            const messageEl = document.getElementById('toastMessage');
+
+            const icons = {
+                success: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+                error: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+                info: '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+            };
+
+            // Clear pending hide timer nếu toast cũ đang đếm ngược
+            if (toastHideTimer) {
+                clearTimeout(toastHideTimer);
+                toastHideTimer = null;
+            }
+
+            toast.className = 'toast ' + type;
+            icon.innerHTML = icons[type] || icons.info;
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            requestAnimationFrame(() => toast.classList.add('show'));
+            toastHideTimer = setTimeout(() => {
+                toast.classList.remove('show');
+                toastHideTimer = null;
+            }, 4000);
+        }
+
+        // Parse date string từ Excel thành "YYYY-MM-DD"
+        // Hỗ trợ: "29-Apr-2026" (string), Date object, Excel serial number
+        function parseDateToDay(value) {
+            if (!value) return null;
+
+            const toYMD = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+            // Excel date serial number (number)
+            if (typeof value === 'number') {
+                const excelEpoch = new Date(1899, 11, 30);
+                const dt = new Date(excelEpoch.getTime() + value * 86400000);
+                return toYMD(dt);
+            }
+
+            // Date object
+            if (value instanceof Date) {
+                return toYMD(value);
+            }
+
+            // String dạng "29-Apr-2026" hoặc "DD/MM/YYYY"
+            const str = String(value).trim();
+            const monthMap = {
+                jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+                jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+            };
+
+            // Format "29-Apr-2026"
+            const m1 = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+            if (m1) {
+                const month = monthMap[m1[2].toLowerCase()];
+                return month ? `${m1[3]}-${month}-${m1[1].padStart(2, '0')}` : null;
+            }
+
+            // Format "DD/MM/YYYY" hoặc "D/M/YYYY"
+            const m2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (m2) {
+                return `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}`;
+            }
+
+            // Try Date.parse
+            const parsed = new Date(str);
+            if (!isNaN(parsed)) {
+                return toYMD(parsed);
+            }
+
+            return null;
+        }
+
+        // Lấy "YYYY-MM" từ "YYYY-MM-DD"
+        function dayToMonth(dayStr) {
+            return dayStr ? dayStr.substring(0, 7) : null;
+        }
+
+        // Handle Excel file upload
+        async function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Validate file
+            if (!file.name.match(/\.(xlsx|xls)$/i)) {
+                showToast('error', 'Sai định dạng', 'Vui lòng chọn file .xlsx hoặc .xls');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('uploadOverlay').classList.add('active');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+                // Find header row (chứa cột "Khách Hàng")
+                let headerRowIndex = -1;
+                for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    if (rows[i] && rows[i].some(cell => cell && String(cell).toLowerCase().includes('khách hàng'))) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIndex === -1) {
+                    throw new Error('Không tìm thấy header row chứa "Khách Hàng"');
+                }
+
+                // Map column indexes
+                const headers = rows[headerRowIndex].map(h => h ? String(h).toLowerCase().trim() : '');
+                const colIdx = {
+                    date: headers.findIndex(h => h.includes('thời gian')),
+                    code: headers.findIndex(h => h.includes('mã đơn')),
+                    customer: headers.findIndex(h => h.includes('khách hàng')),
+                    brand: headers.findIndex(h => h === 'brand'),
+                    segment: headers.findIndex(h => h.includes('phân nhóm')),
+                    employee: headers.findIndex(h => h.includes('nhân viên')),
+                    website: headers.findIndex(h => h === 'website'),
+                    total: headers.findIndex(h => h.includes('thành tiền'))
+                };
+
+                if (colIdx.customer === -1 || colIdx.total === -1) {
+                    throw new Error('File Excel thiếu cột bắt buộc (Khách Hàng, Thành tiền)');
+                }
+
+                // Aggregate orders thành customers
+                const dataRows = rows.slice(headerRowIndex + 1).filter(r => r && r[colIdx.customer]);
+                const customerMap = {};
+
+                dataRows.forEach(row => {
+                    const name = String(row[colIdx.customer]).trim();
+                    if (!name) return;
+
+                    if (!customerMap[name]) {
+                        customerMap[name] = {
+                            name: name,
+                            segment: row[colIdx.segment] ? String(row[colIdx.segment]).trim() : 'N/A',
+                            orders: 0,
+                            revenue: 0,
+                            websites: new Set(),
+                            brands: new Set(),
+                            employees: new Set(),
+                            monthlyData: {},
+                            dailyData: {},
+                            allOrders: []
+                        };
+                    }
+
+                    const amount = Number(row[colIdx.total]) || 0;
+                    customerMap[name].orders += 1;
+                    customerMap[name].revenue += amount;
+
+                    // Lưu raw order detail
+                    customerMap[name].allOrders.push({
+                        code: colIdx.code !== -1 && row[colIdx.code] ? String(row[colIdx.code]).trim() : '',
+                        date: row[colIdx.date] ? String(row[colIdx.date]).trim() : '',
+                        website: row[colIdx.website] ? String(row[colIdx.website]).trim() : '',
+                        brand: row[colIdx.brand] ? String(row[colIdx.brand]).trim() : '',
+                        amount: amount
+                    });
+                    if (row[colIdx.website]) {
+                        customerMap[name].websites.add(String(row[colIdx.website]).trim());
+                    }
+                    if (row[colIdx.brand]) {
+                        customerMap[name].brands.add(String(row[colIdx.brand]).trim());
+                    }
+                    if (colIdx.employee !== -1 && row[colIdx.employee]) {
+                        customerMap[name].employees.add(String(row[colIdx.employee]).trim());
+                    }
+
+                    // Group theo ngày + tháng
+                    const dayKey = parseDateToDay(row[colIdx.date]);
+                    if (dayKey) {
+                        if (!customerMap[name].dailyData[dayKey]) {
+                            customerMap[name].dailyData[dayKey] = { orders: 0, revenue: 0 };
+                        }
+                        customerMap[name].dailyData[dayKey].orders += 1;
+                        customerMap[name].dailyData[dayKey].revenue += amount;
+
+                        const monthKey = dayToMonth(dayKey);
+                        if (!customerMap[name].monthlyData[monthKey]) {
+                            customerMap[name].monthlyData[monthKey] = { orders: 0, revenue: 0 };
+                        }
+                        customerMap[name].monthlyData[monthKey].orders += 1;
+                        customerMap[name].monthlyData[monthKey].revenue += amount;
+                    }
+                });
+
+                // Convert Set → Array
+                const newCustomers = Object.values(customerMap).map(c => ({
+                    ...c,
+                    websites: Array.from(c.websites),
+                    brands: Array.from(c.brands),
+                    employees: Array.from(c.employees)
+                }));
+
+                // Merge với data hiện có
+                const result = mergeCustomers(newCustomers);
+
+                // Sort theo doanh thu giảm dần
+                sortCustomersByRevenue();
+
+                // Lưu vào localStorage để giữ lại khi reload trang
+                saveCustomersToStorage();
+
+                // Refresh UI
+                repopulateWebsiteFilter();
+                repopulateEmployeeFilter();
+                populateAdvancedFilterDropdowns();
+                applyFilters();
+                renderDashboardStats();
+                refreshRevenueChart();
+                renderReports();
+
+                document.getElementById('uploadOverlay').classList.remove('active');
+                showToast('success', 'Cập nhật thành công!',
+                    `${result.added} khách mới, ${result.updated} khách cập nhật từ ${dataRows.length} đơn hàng`);
+
+            } catch (error) {
+                document.getElementById('uploadOverlay').classList.remove('active');
+                showToast('error', 'Lỗi đọc file', error.message);
+                console.error(error);
+            }
+
+            // Reset input để có thể upload lại cùng file
+            event.target.value = '';
+        }
+
+        // Merge new customers vào allCustomers (update nếu trùng tên, thêm mới nếu chưa có)
+        function mergeCustomers(newCustomers) {
+            let added = 0, updated = 0;
+
+            newCustomers.forEach(newCust => {
+                const existingIdx = allCustomers.findIndex(c => c.name === newCust.name);
+                if (existingIdx === -1) {
+                    // Khách mới → thêm vào
+                    allCustomers.push(newCust);
+                    added++;
+                } else {
+                    // Khách cũ → update (orders, revenue cộng dồn; websites/brands union)
+                    const existing = allCustomers[existingIdx];
+                    existing.orders += newCust.orders;
+                    existing.revenue += newCust.revenue;
+                    existing.segment = newCust.segment || existing.segment;
+                    existing.websites = Array.from(new Set([...existing.websites, ...newCust.websites]));
+                    existing.brands = Array.from(new Set([...(existing.brands || []), ...newCust.brands]));
+                    existing.employees = Array.from(new Set([...(existing.employees || []), ...(newCust.employees || [])]));
+
+                    // Merge monthlyData
+                    existing.monthlyData = existing.monthlyData || {};
+                    Object.entries(newCust.monthlyData || {}).forEach(([month, data]) => {
+                        if (!existing.monthlyData[month]) {
+                            existing.monthlyData[month] = { orders: 0, revenue: 0 };
+                        }
+                        existing.monthlyData[month].orders += data.orders;
+                        existing.monthlyData[month].revenue += data.revenue;
+                    });
+
+                    // Merge dailyData
+                    existing.dailyData = existing.dailyData || {};
+                    Object.entries(newCust.dailyData || {}).forEach(([day, data]) => {
+                        if (!existing.dailyData[day]) {
+                            existing.dailyData[day] = { orders: 0, revenue: 0 };
+                        }
+                        existing.dailyData[day].orders += data.orders;
+                        existing.dailyData[day].revenue += data.revenue;
+                    });
+
+                    // Merge allOrders (dedup theo code)
+                    existing.allOrders = existing.allOrders || [];
+                    const existingCodes = new Set(existing.allOrders.map(o => o.code).filter(Boolean));
+                    (newCust.allOrders || []).forEach(o => {
+                        if (!o.code || !existingCodes.has(o.code)) {
+                            existing.allOrders.push(o);
+                        }
+                    });
+
+                    updated++;
+                }
+            });
+
+            return { added, updated };
+        }
+
+        // ===== DASHBOARD STATS CALCULATION =====
+
+        // Tính tổng stats + % so sánh tháng trước từ allCustomers
+        function calculateDashboardStats() {
+            // Aggregate monthly data across all customers
+            const monthlyTotals = {};
+            allCustomers.forEach(customer => {
+                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
+                    if (!monthlyTotals[month]) {
+                        monthlyTotals[month] = { customers: new Set(), orders: 0, revenue: 0 };
+                    }
+                    monthlyTotals[month].customers.add(customer.name);
+                    monthlyTotals[month].orders += data.orders;
+                    monthlyTotals[month].revenue += data.revenue;
+                });
+            });
+
+            // Totals
+            const totalCustomers = allCustomers.length;
+            const totalOrders = allCustomers.reduce((sum, c) => sum + c.orders, 0);
+            const totalRevenue = allCustomers.reduce((sum, c) => sum + c.revenue, 0);
+            const avgPerCustomer = totalCustomers ? totalRevenue / totalCustomers : 0;
+
+            // So sánh 2 tháng gần nhất
+            const sortedMonths = Object.keys(monthlyTotals).sort();
+            let trends = null;
+            if (sortedMonths.length >= 2) {
+                const lastMonth = sortedMonths[sortedMonths.length - 1];
+                const prevMonth = sortedMonths[sortedMonths.length - 2];
+                const last = monthlyTotals[lastMonth];
+                const prev = monthlyTotals[prevMonth];
+
+                const pctChange = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
+                const lastAvg = last.customers.size ? last.revenue / last.customers.size : 0;
+                const prevAvg = prev.customers.size ? prev.revenue / prev.customers.size : 0;
+
+                trends = {
+                    customers: pctChange(last.customers.size, prev.customers.size),
+                    orders: pctChange(last.orders, prev.orders),
+                    revenue: pctChange(last.revenue, prev.revenue),
+                    avg: pctChange(lastAvg, prevAvg),
+                    lastMonth: lastMonth,
+                    prevMonth: prevMonth
+                };
+            }
+
+            return { totalCustomers, totalOrders, totalRevenue, avgPerCustomer, trends };
+        }
+
+        // Format số tiền: 19,760,000,000 → "19.76 tỷ"
+        function formatMoney(amount) {
+            if (amount >= 1e9) return (amount / 1e9).toFixed(2) + ' tỷ';
+            if (amount >= 1e6) return (amount / 1e6).toFixed(1) + 'M đ';
+            if (amount >= 1e3) return (amount / 1e3).toFixed(0) + 'K đ';
+            return amount.toLocaleString('vi-VN') + ' đ';
+        }
+
+        // Render trend HTML (icon up/down + % + text)
+        function renderTrend(pct) {
+            if (pct === null || pct === undefined || isNaN(pct)) {
+                return '<span style="color: var(--text-light); font-size: 12px;">Chưa có dữ liệu so sánh</span>';
+            }
+
+            const isUp = pct >= 0;
+            const arrow = isUp
+                ? '<polyline points="18 15 12 9 6 15"></polyline>'
+                : '<polyline points="6 9 12 15 18 9"></polyline>';
+            const sign = isUp ? '+' : '';
+            const trendClass = isUp ? '' : 'down';
+
+            return `<div class="stat-trend ${trendClass}">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">${arrow}</svg>
+                ${sign}${pct.toFixed(1)}% so với tháng trước
+            </div>`;
+        }
+
+        // Track period đang chọn cho reports
+        let currentReportPeriod = 'all';
+        let customDateRange = null; // { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+
+        // Tìm range ngày cho period
+        function getReportDateRange(period) {
+            if (period === 'custom') return customDateRange;
+
+            // Tìm ngày mới nhất có order trong allCustomers
+            let lastDayKey = null;
+            allCustomers.forEach(c => {
+                Object.keys(c.dailyData || {}).forEach(d => {
+                    if (!lastDayKey || d > lastDayKey) lastDayKey = d;
+                });
+            });
+
+            if (!lastDayKey) return null;
+
+            const [y, m, d] = lastDayKey.split('-').map(Number);
+            const lastDate = new Date(y, m - 1, d);
+            const fromDate = new Date(lastDate);
+
+            if (period === 'week') fromDate.setDate(fromDate.getDate() - 6);
+            else if (period === 'month') fromDate.setDate(fromDate.getDate() - 29);
+            else if (period === 'year') fromDate.setMonth(fromDate.getMonth() - 11);
+
+            const toYMD = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            return { from: toYMD(fromDate), to: lastDayKey };
+        }
+
+        // Format YYYY-MM-DD → DD/MM/YYYY
+        function formatDateDDMMYYYY(ymd) {
+            if (!ymd) return '';
+            const [y, m, d] = ymd.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        // Update period và re-render
+        function updateReportPeriod(period) {
+            currentReportPeriod = period;
+
+            // Update active button
+            document.querySelectorAll('#reports-view .view-toggle .view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide custom date range UI
+            const customUI = document.getElementById('customDateRange');
+            if (period === 'custom') {
+                customUI.style.display = 'block';
+                // Default values: last 7 days
+                const defaultRange = getReportDateRange('week');
+                if (defaultRange && !customDateRange) {
+                    document.getElementById('reportDateFrom').value = defaultRange.from;
+                    document.getElementById('reportDateTo').value = defaultRange.to;
+                    customDateRange = defaultRange;
+                } else if (customDateRange) {
+                    document.getElementById('reportDateFrom').value = customDateRange.from;
+                    document.getElementById('reportDateTo').value = customDateRange.to;
+                }
+            } else {
+                customUI.style.display = 'none';
+            }
+
+            // Update label
+            const labels = {
+                all: 'Tất cả thời gian',
+                week: '7 ngày gần nhất',
+                month: '30 ngày gần nhất',
+                year: '12 tháng gần nhất'
+            };
+            const labelEl = document.getElementById('reportPeriodLabel');
+            if (labelEl) {
+                if (period === 'custom' && customDateRange) {
+                    labelEl.textContent = `Từ ${formatDateDDMMYYYY(customDateRange.from)} đến ${formatDateDDMMYYYY(customDateRange.to)}`;
+                } else {
+                    labelEl.textContent = labels[period] || '';
+                }
+            }
+
+            renderReports();
+        }
+
+        // Apply custom date range filter
+        function applyCustomDateRange() {
+            const from = document.getElementById('reportDateFrom').value;
+            const to = document.getElementById('reportDateTo').value;
+
+            if (!from || !to) {
+                showToast('error', 'Thiếu thông tin', 'Vui lòng chọn cả ngày bắt đầu và ngày kết thúc');
+                return;
+            }
+            if (from > to) {
+                showToast('error', 'Ngày không hợp lệ', 'Ngày bắt đầu phải trước ngày kết thúc');
+                return;
+            }
+
+            customDateRange = { from, to };
+            currentReportPeriod = 'custom';
+
+            // Update label
+            const labelEl = document.getElementById('reportPeriodLabel');
+            if (labelEl) labelEl.textContent = `Từ ${formatDateDDMMYYYY(from)} đến ${formatDateDDMMYYYY(to)}`;
+
+            renderReports();
+            showToast('success', 'Đã áp dụng', `Lọc từ ${formatDateDDMMYYYY(from)} đến ${formatDateDDMMYYYY(to)}`);
+        }
+
+        // Render báo cáo & phân tích từ allCustomers (filtered theo currentReportPeriod)
+        function renderReports() {
+            const period = currentReportPeriod;
+            const range = period === 'all' ? null : getReportDateRange(period);
+
+            const isInRange = (dateStr) => {
+                if (!range) return true;
+                const dayKey = parseDateToDay(dateStr);
+                if (!dayKey) return false;
+                return dayKey >= range.from && dayKey <= range.to;
+            };
+
+            // Top 10 Website theo số đơn (filtered)
+            const websiteOrderCount = {};
+            const websiteRevenue = {};
+            const segmentCustomers = {};  // { segName: Set<customerName> }
+            const segmentRevenue = {};
+
+            allCustomers.forEach(c => {
+                let customerHasOrderInRange = false;
+                (c.allOrders || []).forEach(o => {
+                    if (!isInRange(o.date)) return;
+                    customerHasOrderInRange = true;
+
+                    if (o.website && o.website !== 'N/A') {
+                        websiteOrderCount[o.website] = (websiteOrderCount[o.website] || 0) + 1;
+                        websiteRevenue[o.website] = (websiteRevenue[o.website] || 0) + (o.amount || 0);
+                    }
+
+                    const seg = c.segment || 'N/A';
+                    if (!segmentCustomers[seg]) segmentCustomers[seg] = new Set();
+                    segmentCustomers[seg].add(c.name);
+                    segmentRevenue[seg] = (segmentRevenue[seg] || 0) + (o.amount || 0);
+                });
+
+                // Cho period 'all', dùng segment + revenue tổng từ customer (fallback nếu allOrders rỗng)
+                if (period === 'all' && (c.allOrders || []).length === 0) {
+                    const seg = c.segment || 'N/A';
+                    if (!segmentCustomers[seg]) segmentCustomers[seg] = new Set();
+                    segmentCustomers[seg].add(c.name);
+                    segmentRevenue[seg] = (segmentRevenue[seg] || 0) + (c.revenue || 0);
+                }
+            });
+
+            const topWebsites = Object.entries(websiteOrderCount)
+                .map(([name, orders]) => ({ name, orders, revenue: websiteRevenue[name] || 0 }))
+                .sort((a, b) => b.orders - a.orders)
+                .slice(0, 10);
+
+            const wList = document.getElementById('reportTopWebsites');
+            if (wList) {
+                if (topWebsites.length === 0) {
+                    wList.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-light);">Chưa có dữ liệu</div>';
+                } else {
+                    wList.innerHTML = topWebsites.map((w, i) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < topWebsites.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''}">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="color: var(--text-light); font-weight: 500; min-width: 20px;">${i + 1}.</span>
+                                <span>${w.name}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: 600; color: var(--primary);">${w.orders.toLocaleString('vi-VN')} đơn</div>
+                                <div style="font-size: 12px; color: var(--text-gray);">${formatMoney(w.revenue)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Phân nhóm khách hàng (theo period)
+            const segmentColors = {
+                'Sỉ vừa': 'var(--primary)',
+                'Khách Lẻ': 'var(--success)',
+                'CTV': 'var(--warning)',
+                'Sỉ to': '#8B5CF6',
+                'Sỉ nhỏ': '#EC4899',
+                'N/A': 'var(--text-gray)'
+            };
+
+            const sortedSegments = Object.entries(segmentCustomers)
+                .map(([name, customersSet]) => ({
+                    name,
+                    count: customersSet.size,
+                    revenue: segmentRevenue[name] || 0
+                }))
+                .sort((a, b) => b.revenue - a.revenue);
+
+            const sList = document.getElementById('reportSegments');
+            if (sList) {
+                if (sortedSegments.length === 0) {
+                    sList.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-light);">Chưa có dữ liệu</div>';
+                } else {
+                    sList.innerHTML = sortedSegments.map((s, i) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < sortedSegments.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''}">
+                            <div>
+                                <div style="font-weight: 600;">${s.name}</div>
+                                <div style="font-size: 12px; color: var(--text-gray);">${s.count} khách</div>
+                            </div>
+                            <span style="font-weight: 600; color: ${segmentColors[s.name] || 'var(--text-dark)'};">${formatMoney(s.revenue)}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Top 10 Khách hàng theo doanh thu (theo period)
+            const topCustomers = allCustomers.map(c => {
+                if (period === 'all') {
+                    return {
+                        name: c.name,
+                        segment: c.segment,
+                        orders: c.orders,
+                        revenue: c.revenue
+                    };
+                } else {
+                    // Tính từ allOrders trong range
+                    let orders = 0, revenue = 0;
+                    (c.allOrders || []).forEach(o => {
+                        if (isInRange(o.date)) {
+                            orders += 1;
+                            revenue += (o.amount || 0);
+                        }
+                    });
+                    return { name: c.name, segment: c.segment, orders, revenue };
+                }
+            })
+            .filter(c => c.revenue > 0)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 10);
+
+            const cList = document.getElementById('reportTopCustomers');
+            if (cList) {
+                if (topCustomers.length === 0) {
+                    cList.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-light);">Chưa có dữ liệu</div>';
+                } else {
+                    cList.innerHTML = topCustomers.map((c, i) => {
+                        const segmentClass = removeDiacritics(c.segment || '').toLowerCase().replace(/\s+/g, '-');
+                        return `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < topCustomers.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''} cursor: pointer;" onclick="showCustomerDetail('${c.name.replace(/'/g, "\\'")}')">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--text-light); font-weight: 500; min-width: 24px;">${i + 1}.</span>
+                                    <div>
+                                        <div style="font-weight: 600;">${c.name}</div>
+                                        <div style="font-size: 12px; color: var(--text-gray); display: flex; align-items: center; gap: 8px;">
+                                            <span class="badge ${segmentClass}" style="font-size: 11px; padding: 2px 8px;">${c.segment || '-'}</span>
+                                            <span>${c.orders.toLocaleString('vi-VN')} đơn</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span style="font-weight: 600; color: var(--primary); font-size: 16px;">${formatMoney(c.revenue)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+
+        // Render Dashboard stats từ allCustomers
+        function renderDashboardStats() {
+            const stats = calculateDashboardStats();
+
+            document.getElementById('statTotalCustomers').textContent = stats.totalCustomers.toLocaleString('vi-VN');
+            document.getElementById('statTotalOrders').textContent = stats.totalOrders.toLocaleString('vi-VN');
+            document.getElementById('statTotalRevenue').textContent = formatMoney(stats.totalRevenue);
+            document.getElementById('statAvgPerCustomer').textContent = formatMoney(stats.avgPerCustomer);
+
+            // Update trends
+            const t = stats.trends;
+            document.getElementById('trendCustomers').outerHTML = `<div id="trendCustomers">${renderTrend(t?.customers)}</div>`;
+            document.getElementById('trendOrders').outerHTML = `<div id="trendOrders">${renderTrend(t?.orders)}</div>`;
+            document.getElementById('trendRevenue').outerHTML = `<div id="trendRevenue">${renderTrend(t?.revenue)}</div>`;
+            document.getElementById('trendAvg').outerHTML = `<div id="trendAvg">${renderTrend(t?.avg)}</div>`;
+        }
+
+        // Re-populate website filter sau khi merge
+        function repopulateWebsiteFilter() {
+            const select = document.getElementById('websiteFilter');
+            const currentValue = select.value;
+
+            // Clear options (giữ option đầu "Tất cả website")
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            const allWebsites = new Set();
+            allCustomers.forEach(c => c.websites.forEach(w => allWebsites.add(w)));
+            const sortedWebsites = Array.from(allWebsites).filter(w => w && w !== 'N/A').sort();
+
+            sortedWebsites.forEach(website => {
+                const option = document.createElement('option');
+                option.value = website;
+                option.textContent = website;
+                select.appendChild(option);
+            });
+
+            select.value = currentValue;
+        }
+
+        // Initialize customer view khi load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load data đã lưu (nếu có) trước khi render
+            loadCustomersFromStorage();
+            sortCustomersByRevenue();
+            filteredCustomers = [...allCustomers];
+
+            populateWebsiteFilter();
+            populateEmployeeFilter();
+            populateAdvancedFilterDropdowns();
+            renderCustomerTable(allCustomers);
+            renderDashboardStats();
+            refreshRevenueChart();
+            renderReports();
+
+            // Event listeners
+            document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+            document.getElementById('segmentFilter')?.addEventListener('change', applyFilters);
+            document.getElementById('websiteFilter')?.addEventListener('change', applyFilters);
+            document.getElementById('employeeFilter')?.addEventListener('change', applyFilters);
+        });
+    </script>
+
+    <!-- Customer Detail Modal -->
+    <div class="modal-overlay" id="customerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <h2 class="modal-title" id="modalCustomerName">Chi tiết khách hàng</h2>
+                        <span class="badge" id="modalSegment">-</span>
+                    </div>
+                    <div style="font-size: 13px; color: var(--text-gray); margin-top: 6px;">
+                        Nhân viên phụ trách: <span id="modalEmployees" style="color: var(--text-dark); font-weight: 500;">-</span>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeCustomerModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Filter theo tháng -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 12px 16px; background: var(--bg-main); border-radius: 8px;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-gray);">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <label style="font-weight: 500; color: var(--text-dark);">Xem doanh thu theo:</label>
+                    <select class="filter-select" id="modalMonthFilter" style="flex: 1; max-width: 250px;" onchange="renderModalStats()">
+                        <option value="all">Tất cả thời gian</option>
+                    </select>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card" onclick="showAllOrdersModal()" style="cursor: pointer;" title="Click để xem chi tiết tất cả đơn hàng">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="modalOrders">0</div>
+                                <div class="stat-label" style="display: flex; align-items: center; gap: 4px;">
+                                    Tổng đơn hàng
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </div>
+                                <div id="modalOrdersTrend"></div>
+                            </div>
+                            <div class="stat-icon success">
+                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="9" cy="21" r="1"></circle>
+                                    <circle cx="20" cy="21" r="1"></circle>
+                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="modalRevenue">0</div>
+                                <div class="stat-label">Tổng doanh thu</div>
+                                <div id="modalRevenueTrend"></div>
+                            </div>
+                            <div class="stat-icon warning">
+                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="modalAvgOrder">0</div>
+                                <div class="stat-label">Giá trị TB/Đơn</div>
+                            </div>
+                            <div class="stat-icon primary">
+                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <line x1="12" y1="20" x2="12" y2="10"></line>
+                                    <line x1="18" y1="20" x2="18" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="16"></line>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card" onclick="showAllWebsitesModal()" style="cursor: pointer;" title="Click để xem chi tiết tất cả websites">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="modalWebsites">0</div>
+                                <div class="stat-label" style="display: flex; align-items: center; gap: 4px;">
+                                    Websites quan tâm
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="stat-icon secondary">
+                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Website quan tâm -->
+                <h3 class="section-title">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    Website quan tâm
+                </h3>
+                <div class="website-chips" id="modalWebsiteList">
+                    <!-- Dynamic content -->
+                </div>
+
+                <!-- Đơn hàng gần đây -->
+                <h3 class="section-title">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    Đơn hàng gần đây
+                </h3>
+                <div class="order-list" id="modalOrderList">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Websites Modal -->
+    <div class="modal-overlay" id="allWebsitesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <h2 class="modal-title">Tất cả websites</h2>
+                    <span id="allWebsitesCount" style="color: var(--text-gray); font-size: 14px;"></span>
+                </div>
+                <button class="modal-close" onclick="closeAllWebsitesModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="allWebsitesList">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Orders Modal -->
+    <div class="modal-overlay" id="allOrdersModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <h2 class="modal-title">Tất cả đơn hàng</h2>
+                    <span id="allOrdersCount" style="color: var(--text-gray); font-size: 14px;"></span>
+                </div>
+                <button class="modal-close" onclick="closeAllOrdersModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="order-list" id="allOrdersList">
+                    <!-- Dynamic content -->
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: var(--text-gray); font-size: 14px;" id="allOrdersPaginationInfo"></div>
+                    <div style="display: flex; gap: 8px;" id="allOrdersPaginationControls"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Loading Overlay -->
+    <div class="upload-overlay" id="uploadOverlay">
+        <div class="upload-loading">
+            <div class="spinner"></div>
+            <div style="font-weight: 600; color: var(--text-dark);">Đang xử lý file Excel...</div>
+            <div style="font-size: 13px; color: var(--text-gray); margin-top: 4px;">Vui lòng đợi trong giây lát</div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-icon" id="toastIcon"></div>
+        <div class="toast-content">
+            <div class="toast-title" id="toastTitle">Title</div>
+            <div class="toast-message" id="toastMessage">Message</div>
+        </div>
+        <button onclick="document.getElementById('toast').classList.remove('show')" style="background: transparent; border: none; cursor: pointer; padding: 4px; color: var(--text-light); display: flex;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+</body>
+</html>
