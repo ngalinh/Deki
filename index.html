@@ -824,7 +824,7 @@
         <div id="dashboard-view">
             <div class="header">
                 <div>
-                    <h2>Dashboard</h2>
+                    <h2 id="welcomeMessage">Dashboard</h2>
                     <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Tổng quan hoạt động kinh doanh</p>
                 </div>
                 <div class="header-actions">
@@ -3129,11 +3129,12 @@
             try {
                 const res = await apiGet('/api/me');
                 currentUser = res.user;
+                const raw = currentUser.name || currentUser.email || '';
+                const displayName = raw.includes('@') ? raw.split('@')[0] : raw;
                 const userLabel = document.getElementById('userLabel');
-                if (userLabel) {
-                    const raw = currentUser.name || currentUser.email || '';
-                    userLabel.textContent = raw.includes('@') ? raw.split('@')[0] : raw;
-                }
+                if (userLabel) userLabel.textContent = displayName;
+                const welcome = document.getElementById('welcomeMessage');
+                if (welcome) welcome.textContent = `Welcome, ${displayName}`;
                 // Show admin nav nếu là Deki admin
                 if (currentUser.isDekiAdmin) {
                     document.getElementById('navAdmin')?.classList.remove('section-hidden');

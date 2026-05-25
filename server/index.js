@@ -7,7 +7,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 
 const db = require('./src/db');
-const { requireAuth, verifyBassoSession, isDekiAdmin, hasAccess } = require('./src/auth');
+const { requireAuth, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache } = require('./src/auth');
 const { runMigrations } = require('./src/migrate');
 
 const app = express();
@@ -338,6 +338,7 @@ app.post('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => 
              ON DUPLICATE KEY UPDATE name = VALUES(name), is_admin = VALUES(is_admin)`,
             [cleanEmail, name || null, is_admin ? 1 : 0]
         );
+        clearSessionCache(); // để user nhìn thấy tên/quyền mới ngay
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
@@ -353,6 +354,7 @@ app.delete('/api/permissions/:email', requireAuth(), requireAdmin(), async (req,
             return res.status(400).json({ success: false, error: 'Không thể xóa chính mình' });
         }
         await db.query('DELETE FROM deki_permissions WHERE email = ?', [email]);
+        clearSessionCache();
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });

@@ -103,4 +103,8 @@ function requireAuth() {
     };
 }
 
-module.exports = { verifyBassoSession, requireAuth, hasAccess, isDekiAdmin };
+function clearSessionCache() {
+    sessionCache.clear();
+}
+
+module.exports = { verifyBassoSession, requireAuth, hasAccess, isDekiAdmin, clearSessionCache };
