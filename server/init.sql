@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS deki_customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(32),
     segment VARCHAR(64),
     total_orders INT DEFAULT 0,
     total_revenue DECIMAL(18, 2) DEFAULT 0,

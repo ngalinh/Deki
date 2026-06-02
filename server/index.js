@@ -94,14 +94,14 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
         let customers = [];
         if (isAdmin) {
             customers = await db.query(`
-                SELECT id, name, segment, total_orders AS orders, total_revenue AS revenue
+                SELECT id, name, phone, segment, total_orders AS orders, total_revenue AS revenue
                 FROM deki_customers ORDER BY total_revenue DESC
             `);
         } else if (customerIds.length > 0) {
             // Non-admin: chỉ lấy customers có orders → tính orders/revenue từ filtered orders
             const placeholders = customerIds.map(() => '?').join(',');
             customers = await db.query(
-                `SELECT id, name, segment FROM deki_customers WHERE id IN (${placeholders})`,
+                `SELECT id, name, phone, segment FROM deki_customers WHERE id IN (${placeholders})`,
                 customerIds
             );
             // Compute orders/revenue per customer từ filtered orders
@@ -170,6 +170,7 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
             return {
                 id: c.id,
                 name: c.name,
+                phone: c.phone || '',
                 segment: c.segment,
                 orders: Number(c.orders) || 0,
                 revenue: Number(c.revenue) || 0,
@@ -239,6 +240,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
             date: headers.findIndex(h => h.includes('thời gian')),
             code: headers.findIndex(h => h.includes('mã đơn')),
             customer: headers.findIndex(h => h.includes('khách hàng')),
+            phone: headers.findIndex(h => h.includes('điện thoại') || h.includes('sđt') || h.includes('số đt')),
             brand: headers.findIndex(h => h === 'brand'),
             segment: headers.findIndex(h => h.includes('phân nhóm')),
             employee: headers.findIndex(h => h.includes('nhân viên')),
@@ -252,14 +254,20 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
         const dataRows = rows.slice(headerRowIndex + 1).filter(r => r && r[colIdx.customer]);
 
         // Parse rows → list orders + customers
-        const customersMap = new Map(); // name → { segment }
+        const customersMap = new Map(); // name → { segment, phone }
         const orders = [];
 
         for (const row of dataRows) {
             const name = String(row[colIdx.customer]).trim();
             if (!name) continue;
             const segment = colIdx.segment !== -1 && row[colIdx.segment] ? String(row[colIdx.segment]).trim() : null;
-            if (!customersMap.has(name)) customersMap.set(name, { segment });
+            const phone = colIdx.phone !== -1 && row[colIdx.phone] != null ? String(row[colIdx.phone]).trim() : null;
+            if (!customersMap.has(name)) {
+                customersMap.set(name, { segment, phone });
+            } else if (phone) {
+                // Cập nhật phone nếu row sau có phone (giữ phone mới nhất không rỗng)
+                customersMap.get(name).phone = phone;
+            }
 
             const dateVal = row[colIdx.date];
             let orderDate = null;
@@ -303,9 +311,11 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
             // Upsert customers
             for (const [name, info] of customersMap) {
                 await conn.execute(
-                    `INSERT INTO deki_customers (name, segment) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE segment = COALESCE(VALUES(segment), segment)`,
-                    [name, info.segment]
+                    `INSERT INTO deki_customers (name, phone, segment) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        phone = COALESCE(VALUES(phone), phone),
+                        segment = COALESCE(VALUES(segment), segment)`,
+                    [name, info.phone, info.segment]
                 );
             }
 

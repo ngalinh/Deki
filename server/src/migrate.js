@@ -38,6 +38,22 @@ async function runMigrations() {
             console.error('[migrate] staff_name migration error:', e.message);
         }
 
+        // Migration: thêm cột phone vào deki_customers nếu chưa có
+        try {
+            const cols = await db.query(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'deki_customers'
+                   AND COLUMN_NAME = 'phone'`
+            );
+            if (cols.length === 0) {
+                await pool.query(`ALTER TABLE deki_customers ADD COLUMN phone VARCHAR(32) AFTER name`);
+                console.log('[migrate] Đã thêm cột phone vào deki_customers');
+            }
+        } catch (e) {
+            console.error('[migrate] phone migration error:', e.message);
+        }
+
         // Insert super admin từ env (nếu chưa có)
         const superAdmin = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().trim();
         if (superAdmin) {

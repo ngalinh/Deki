@@ -977,7 +977,7 @@
                             <circle cx="11" cy="11" r="8"></circle>
                             <path d="m21 21-4.35-4.35"></path>
                         </svg>
-                        <input type="text" id="searchInput" placeholder="Tìm kiếm theo tên khách hàng...">
+                        <input type="text" id="searchInput" placeholder="Tìm theo tên hoặc SĐT...">
                     </div>
 
                     <select class="filter-select" id="segmentFilter">
@@ -1005,6 +1005,7 @@
                     <thead>
                         <tr>
                             <th>Khách hàng</th>
+                            <th>SĐT</th>
                             <th>Phân nhóm</th>
                             <th>Brand</th>
                             <th>Nhân viên</th>
@@ -1179,6 +1180,7 @@
                         <thead>
                             <tr>
                                 <th>Khách hàng</th>
+                                <th>SĐT</th>
                                 <th>Phân nhóm</th>
                                 <th>Brand</th>
                                 <th>Nhân viên</th>
@@ -1301,6 +1303,9 @@
             const segmentClass = removeDiacritics(customer.segment).toLowerCase().replace(/\s+/g, '-');
             segmentBadge.textContent = customer.segment;
             segmentBadge.className = 'badge ' + segmentClass;
+
+            // SĐT khách hàng
+            document.getElementById('modalPhone').textContent = customer.phone || 'Chưa có';
 
             // Nhân viên phụ trách (filter bỏ EXCLUDED_EMPLOYEES)
             const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
@@ -2166,7 +2171,7 @@
                 const message = hasAnyData
                     ? 'Không tìm thấy khách hàng phù hợp với bộ lọc'
                     : 'Chưa có dữ liệu. Vui lòng click <strong>"Cập nhật từ Excel"</strong> để upload file DS_DONHANG.xlsx';
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 48px; color: var(--text-light);">${message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 48px; color: var(--text-light);">${message}</td></tr>`;
                 renderPagination(0);
                 return;
             }
@@ -2193,6 +2198,7 @@
                 return `
                     <tr onclick="showCustomerDetail('${customer.name}')">
                         <td class="customer-name">${customer.name}</td>
+                        <td style="color: var(--text-gray);">${customer.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
                         <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
                         <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
@@ -2354,7 +2360,7 @@
             const pageCustomers = advFilteredCustomers.slice(startIdx, endIdx);
 
             if (advFilteredCustomers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-light);">Không có khách hàng nào phù hợp với bộ lọc</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">Không có khách hàng nào phù hợp với bộ lọc</td></tr>';
                 document.getElementById('advPaginationInfo').textContent = '';
                 document.getElementById('advPaginationControls').innerHTML = '';
                 return;
@@ -2371,6 +2377,7 @@
                 return `
                     <tr onclick="showCustomerDetail('${c.name.replace(/'/g, "\\'")}')" style="cursor: pointer;">
                         <td class="customer-name">${c.name}</td>
+                        <td style="color: var(--text-gray);">${c.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${c.segment || '-'}</span></td>
                         <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
                         <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
@@ -2440,6 +2447,7 @@
 
             const data = advFilteredCustomers.map(c => ({
                 'Tên khách hàng': c.name,
+                'Số điện thoại': c.phone || '',
                 'Phân nhóm': c.segment || '',
                 'Brand': (c.brands || []).join(', '),
                 'Nhân viên': (c.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())).join(', '),
@@ -2466,9 +2474,10 @@
             const employeeFilter = document.getElementById('employeeFilter').value;
 
             filteredCustomers = allCustomers.filter(customer => {
-                // Search filter: tìm theo tên (bỏ dấu)
+                // Search filter: tìm theo tên (bỏ dấu) hoặc SĐT
                 const nameNoDiacritics = removeDiacritics(customer.name).toLowerCase();
-                const matchSearch = !searchTerm || nameNoDiacritics.includes(searchTerm);
+                const phone = (customer.phone || '').toLowerCase();
+                const matchSearch = !searchTerm || nameNoDiacritics.includes(searchTerm) || phone.includes(searchTerm);
 
                 // Segment filter
                 const matchSegment = !segmentFilter || customer.segment === segmentFilter;
@@ -3199,8 +3208,9 @@
                         <h2 class="modal-title" id="modalCustomerName">Chi tiết khách hàng</h2>
                         <span class="badge" id="modalSegment">-</span>
                     </div>
-                    <div style="font-size: 13px; color: var(--text-gray); margin-top: 6px;">
-                        Nhân viên phụ trách: <span id="modalEmployees" style="color: var(--text-dark); font-weight: 500;">-</span>
+                    <div style="font-size: 13px; color: var(--text-gray); margin-top: 6px; display: flex; gap: 20px; flex-wrap: wrap;">
+                        <span>SĐT: <span id="modalPhone" style="color: var(--primary); font-weight: 500;">-</span></span>
+                        <span>Nhân viên phụ trách: <span id="modalEmployees" style="color: var(--text-dark); font-weight: 500;">-</span></span>
                     </div>
                 </div>
                 <button class="modal-close" onclick="closeCustomerModal()">
