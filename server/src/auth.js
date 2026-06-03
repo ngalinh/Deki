@@ -111,4 +111,20 @@ function clearSessionCache() {
     sessionCache.clear();
 }
 
-module.exports = { verifyBassoSession, requireAuth, hasAccess, isDekiAdmin, clearSessionCache };
+// Auth server-to-server bằng API key (cho Zalo CRM gọi, không qua session basso).
+// Set DEKI_API_KEY trong .env. Header: X-Api-Key.
+function requireApiKey() {
+    return (req, res, next) => {
+        const expected = (process.env.DEKI_API_KEY || '').trim();
+        if (!expected) {
+            return res.status(503).json({ success: false, error: 'DEKI_API_KEY chưa cấu hình' });
+        }
+        const got = (req.headers['x-api-key'] || '').toString().trim();
+        if (got !== expected) {
+            return res.status(401).json({ success: false, error: 'API key không hợp lệ' });
+        }
+        next();
+    };
+}
+
+module.exports = { verifyBassoSession, requireAuth, requireApiKey, hasAccess, isDekiAdmin, clearSessionCache };

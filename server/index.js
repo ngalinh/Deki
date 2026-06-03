@@ -7,7 +7,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 
 const db = require('./src/db');
-const { requireAuth, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache } = require('./src/auth');
+const { requireAuth, requireApiKey, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache } = require('./src/auth');
 const { runMigrations } = require('./src/migrate');
 
 const app = express();
@@ -445,6 +445,49 @@ app.delete('/api/customers', requireAuth(), async (req, res) => {
         await db.query('DELETE FROM deki_customers');
         res.json({ success: true, message: 'Đã xóa toàn bộ data' });
     } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ===== Partner API (server-to-server, auth bằng API key) =====
+// Cho Zalo CRM tra thông tin khách + đơn theo SĐT. KHÔNG dùng session basso, không scope theo nhân viên.
+// GET /api/partner/customer-by-phone?phone=09xxxxxxxx
+app.get('/api/partner/customer-by-phone', requireApiKey(), async (req, res) => {
+    try {
+        const raw = String(req.query.phone || '').trim();
+        const digits = raw.replace(/\D/g, '');
+        if (digits.length < 8) {
+            return res.status(400).json({ success: false, error: 'SĐT không hợp lệ' });
+        }
+        // Khớp theo 9 chữ số cuối (lõi số VN) → bỏ qua khác biệt 0/+84/khoảng trắng.
+        const core = digits.slice(-9);
+        const customers = await db.query(
+            `SELECT id, name, phone, segment, total_orders, total_revenue
+             FROM deki_customers WHERE REPLACE(REPLACE(phone,' ',''),'+','') LIKE CONCAT('%', ?) LIMIT 1`,
+            [core]
+        );
+        if (customers.length === 0) {
+            return res.json({ success: true, found: false, customer: null, orders: [] });
+        }
+        const c = customers[0];
+        const orders = await db.query(
+            `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%m-%Y') AS date,
+                    website, brand, employee, amount
+             FROM deki_orders WHERE customer_id = ? ORDER BY order_date DESC`,
+            [c.id]
+        );
+        res.json({
+            success: true,
+            found: true,
+            customer: {
+                id: c.id, name: c.name, phone: c.phone || '', segment: c.segment,
+                totalOrders: Number(c.total_orders) || 0,
+                totalRevenue: Number(c.total_revenue) || 0,
+            },
+            orders: orders.map(o => ({ ...o, amount: Number(o.amount) || 0 })),
+        });
+    } catch (e) {
+        console.error('[api/partner/customer-by-phone] error:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
