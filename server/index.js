@@ -493,6 +493,34 @@ app.get('/api/partner/customer-by-phone', requireApiKey(), async (req, res) => {
     }
 });
 
+// POST /api/partner/segments-by-phones - tra phân nhóm + tổng đơn/doanh thu cho NHIỀU SĐT 1 lần.
+// Body: { phones: ["09...", ...] } → { success, map: { "<phone gốc>": { segment, totalOrders, totalRevenue } } }
+app.post('/api/partner/segments-by-phones', requireApiKey(), async (req, res) => {
+    try {
+        const phones = Array.isArray(req.body?.phones) ? req.body.phones : [];
+        const coreOf = (p) => String(p || '').replace(/\D/g, '').slice(-9);
+        const cores = [...new Set(phones.map(coreOf).filter(c => c.length >= 8))];
+        if (cores.length === 0) return res.json({ success: true, map: {} });
+        const placeholders = cores.map(() => '?').join(',');
+        const rows = await db.query(
+            `SELECT phone, segment, total_orders, total_revenue FROM deki_customers
+             WHERE RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) IN (${placeholders})`,
+            cores
+        );
+        const byCore = new Map();
+        for (const r of rows) byCore.set(coreOf(r.phone), r);
+        const map = {};
+        for (const p of phones) {
+            const r = byCore.get(coreOf(p));
+            if (r) map[p] = { segment: r.segment || '', totalOrders: Number(r.total_orders) || 0, totalRevenue: Number(r.total_revenue) || 0 };
+        }
+        res.json({ success: true, map });
+    } catch (e) {
+        console.error('[api/partner/segments-by-phones] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // SPA fallback: gửi index.html cho mọi route không match (trừ /api)
 app.get(/^(?!\/api|\/health).*/, (req, res) => {
     res.sendFile(path.join(ROOT_DIR, 'index.html'));
