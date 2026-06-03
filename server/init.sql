@@ -2,15 +2,17 @@
 -- Chạy: mysql -u <user> -p basso_platform < init.sql
 
 -- Bảng deki_customers: thông tin tổng hợp khách (cached aggregates)
+-- Khách phân biệt theo (name, phone): cùng tên khác SĐT = 2 khách riêng
 CREATE TABLE IF NOT EXISTS deki_customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    phone VARCHAR(32),
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(32) NOT NULL DEFAULT '',
     segment VARCHAR(64),
     total_orders INT DEFAULT 0,
     total_revenue DECIMAL(18, 2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_name_phone (name, phone),
     INDEX idx_segment (segment),
     INDEX idx_revenue (total_revenue DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

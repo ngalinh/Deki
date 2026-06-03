@@ -47,11 +47,42 @@ async function runMigrations() {
                    AND COLUMN_NAME = 'phone'`
             );
             if (cols.length === 0) {
-                await pool.query(`ALTER TABLE deki_customers ADD COLUMN phone VARCHAR(32) AFTER name`);
+                await pool.query(`ALTER TABLE deki_customers ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT '' AFTER name`);
                 console.log('[migrate] Đã thêm cột phone vào deki_customers');
             }
         } catch (e) {
             console.error('[migrate] phone migration error:', e.message);
+        }
+
+        // Migration: đổi unique key từ (name) sang (name, phone)
+        // → khách cùng tên khác SĐT được tách thành 2 khách riêng
+        try {
+            // 1) Chuẩn hóa phone NULL → '' (composite unique cần phone không NULL)
+            await pool.query(`UPDATE deki_customers SET phone = '' WHERE phone IS NULL`);
+
+            // 2) Đảm bảo cột phone NOT NULL DEFAULT ''
+            await pool.query(`ALTER TABLE deki_customers MODIFY COLUMN phone VARCHAR(32) NOT NULL DEFAULT ''`).catch(() => {});
+
+            // 3) Lấy danh sách index hiện có
+            const indexes = await db.query(
+                `SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'deki_customers'`
+            );
+            const indexNames = indexes.map(i => i.INDEX_NAME);
+
+            // 4) Drop unique index cũ trên `name` (tên index mặc định = 'name')
+            if (indexNames.includes('name')) {
+                await pool.query(`ALTER TABLE deki_customers DROP INDEX name`);
+                console.log('[migrate] Đã drop unique index cũ trên name');
+            }
+
+            // 5) Thêm composite unique (name, phone) nếu chưa có
+            if (!indexNames.includes('uniq_name_phone')) {
+                await pool.query(`ALTER TABLE deki_customers ADD UNIQUE KEY uniq_name_phone (name, phone)`);
+                console.log('[migrate] Đã thêm unique key (name, phone)');
+            }
+        } catch (e) {
+            console.error('[migrate] unique key migration error:', e.message);
         }
 
         // Insert super admin từ env (nếu chưa có)

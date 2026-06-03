@@ -1289,8 +1289,10 @@
 
         let currentModalCustomer = null;
 
-        function showCustomerDetail(name) {
-            const customer = allCustomers.find(c => c.name === name);
+        function showCustomerDetail(idOrName) {
+            // Ưu tiên tra theo id (phân biệt khách trùng tên khác SĐT); fallback tra theo tên
+            let customer = allCustomers.find(c => String(c.id) === String(idOrName));
+            if (!customer) customer = allCustomers.find(c => c.name === idOrName);
             if (!customer) return;
 
             currentModalCustomer = customer;
@@ -2196,7 +2198,7 @@
                     : `${employees[0]} +${employees.length - 1}`;
 
                 return `
-                    <tr onclick="showCustomerDetail('${customer.name}')">
+                    <tr onclick="showCustomerDetail('${customer.id}')">
                         <td class="customer-name">${customer.name}</td>
                         <td style="color: var(--text-gray);">${customer.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
@@ -2375,7 +2377,7 @@
                 const brandsText = (c.brands || []).join(', ') || '-';
 
                 return `
-                    <tr onclick="showCustomerDetail('${c.name.replace(/'/g, "\\'")}')" style="cursor: pointer;">
+                    <tr onclick="showCustomerDetail('${c.id}')" style="cursor: pointer;">
                         <td class="customer-name">${c.name}</td>
                         <td style="color: var(--text-gray);">${c.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${c.segment || '-'}</span></td>
@@ -3068,6 +3070,7 @@
             const topCustomers = allCustomers.map(c => {
                 if (period === 'all') {
                     return {
+                        id: c.id,
                         name: c.name,
                         segment: c.segment,
                         orders: c.orders,
@@ -3082,7 +3085,7 @@
                             revenue += (o.amount || 0);
                         }
                     });
-                    return { name: c.name, segment: c.segment, orders, revenue };
+                    return { id: c.id, name: c.name, segment: c.segment, orders, revenue };
                 }
             })
             .filter(c => c.revenue > 0)
@@ -3097,7 +3100,7 @@
                     cList.innerHTML = topCustomers.map((c, i) => {
                         const segmentClass = removeDiacritics(c.segment || '').toLowerCase().replace(/\s+/g, '-');
                         return `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < topCustomers.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''} cursor: pointer;" onclick="showCustomerDetail('${c.name.replace(/'/g, "\\'")}')">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < topCustomers.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''} cursor: pointer;" onclick="showCustomerDetail('${c.id}')">
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <span style="color: var(--text-light); font-weight: 500; min-width: 24px;">${i + 1}.</span>
                                     <div>

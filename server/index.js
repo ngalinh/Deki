@@ -254,19 +254,21 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
         const dataRows = rows.slice(headerRowIndex + 1).filter(r => r && r[colIdx.customer]);
 
         // Parse rows → list orders + customers
-        const customersMap = new Map(); // name → { segment, phone }
+        // Key khách = name + phone → cùng tên khác SĐT là 2 khách riêng
+        const custKey = (name, phone) => `${name} ${phone || ''}`;
+        const customersMap = new Map(); // key → { name, phone, segment }
         const orders = [];
 
         for (const row of dataRows) {
             const name = String(row[colIdx.customer]).trim();
             if (!name) continue;
             const segment = colIdx.segment !== -1 && row[colIdx.segment] ? String(row[colIdx.segment]).trim() : null;
-            const phone = colIdx.phone !== -1 && row[colIdx.phone] != null ? String(row[colIdx.phone]).trim() : null;
-            if (!customersMap.has(name)) {
-                customersMap.set(name, { segment, phone });
-            } else if (phone) {
-                // Cập nhật phone nếu row sau có phone (giữ phone mới nhất không rỗng)
-                customersMap.get(name).phone = phone;
+            const phone = colIdx.phone !== -1 && row[colIdx.phone] != null ? String(row[colIdx.phone]).trim() : '';
+            const key = custKey(name, phone);
+            if (!customersMap.has(key)) {
+                customersMap.set(key, { name, phone, segment });
+            } else if (segment && !customersMap.get(key).segment) {
+                customersMap.get(key).segment = segment;
             }
 
             const dateVal = row[colIdx.date];
@@ -293,7 +295,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
             }
 
             orders.push({
-                customerName: name,
+                customerKey: key,
                 code: colIdx.code !== -1 && row[colIdx.code] ? String(row[colIdx.code]).trim() : null,
                 date: orderDate,
                 website: colIdx.website !== -1 && row[colIdx.website] ? String(row[colIdx.website]).trim() : null,
@@ -308,20 +310,19 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
         try {
             await conn.beginTransaction();
 
-            // Upsert customers
-            for (const [name, info] of customersMap) {
+            // Upsert customers (theo name + phone)
+            for (const info of customersMap.values()) {
                 await conn.execute(
                     `INSERT INTO deki_customers (name, phone, segment) VALUES (?, ?, ?)
                      ON DUPLICATE KEY UPDATE
-                        phone = COALESCE(VALUES(phone), phone),
                         segment = COALESCE(VALUES(segment), segment)`,
-                    [name, info.phone, info.segment]
+                    [info.name, info.phone, info.segment]
                 );
             }
 
-            // Fetch customer id map
-            const [custRows] = await conn.execute('SELECT id, name FROM deki_customers');
-            const idMap = new Map(custRows.map(r => [r.name, r.id]));
+            // Fetch customer id map (key = name + phone)
+            const [custRows] = await conn.execute('SELECT id, name, phone FROM deki_customers');
+            const idMap = new Map(custRows.map(r => [`${r.name} ${r.phone || ''}`, r.id]));
 
             // Insert orders (skip duplicate codes)
             let inserted = 0;
@@ -331,7 +332,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 const values = [];
                 const placeholders = [];
                 for (const o of batch) {
-                    const cid = idMap.get(o.customerName);
+                    const cid = idMap.get(o.customerKey);
                     if (!cid) continue;
                     placeholders.push('(?, ?, ?, ?, ?, ?, ?)');
                     values.push(cid, o.code, o.date, o.website, o.brand, o.employee, o.amount);
