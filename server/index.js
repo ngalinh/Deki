@@ -322,7 +322,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
 
             // Fetch customer id map (key = name + phone)
             const [custRows] = await conn.execute('SELECT id, name, phone FROM deki_customers');
-            const idMap = new Map(custRows.map(r => [`${r.name} ${r.phone || ''}`, r.id]));
+            const idMap = new Map(custRows.map(r => [custKey(r.name, r.phone), r.id]));
 
             // Insert orders (skip duplicate codes)
             let inserted = 0;
