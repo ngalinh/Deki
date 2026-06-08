@@ -846,9 +846,9 @@
                         <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Thời gian</label>
                         <select class="filter-select" id="dashPeriod" onchange="onDashPeriodChange()" style="min-width: 160px;">
                             <option value="all">Tất cả thời gian</option>
-                            <option value="week">7 ngày gần nhất</option>
-                            <option value="month">30 ngày gần nhất</option>
-                            <option value="year">12 tháng gần nhất</option>
+                            <option value="week">Tuần</option>
+                            <option value="month">Tháng</option>
+                            <option value="year">Năm</option>
                             <option value="custom">Tùy chọn</option>
                         </select>
                     </div>
@@ -948,11 +948,6 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <h3 class="chart-title">Doanh thu theo thời gian</h3>
-                        <div class="view-toggle">
-                            <button class="view-btn active" onclick="updateRevenueChart('week')">Tuần</button>
-                            <button class="view-btn" onclick="updateRevenueChart('month')">Tháng</button>
-                            <button class="view-btn" onclick="updateRevenueChart('year')">Năm</button>
-                        </div>
                     </div>
                     <canvas id="revenueChart" style="max-height: 300px;"></canvas>
                 </div>
@@ -1678,54 +1673,60 @@
         const segmentData = { labels: [], data: [], counts: [] };
         const websiteData = { labels: [], orders: [], revenue: [] };
 
-        // Recompute segment + website data từ allCustomers + refresh 2 charts
+        // Refresh CẢ 3 chart (doanh thu + phân nhóm + top website) theo dashboardRange
         function refreshDashboardCharts() {
-            // Segment
-            const segs = {};
+            const range = dashboardRange;
+            const inRange = (ymd) => !range || (ymd >= range.from && ymd <= range.to);
+
+            // ===== Revenue line chart =====
+            const rev = buildRevenueSeries(range);
+            if (revenueChart) {
+                revenueChart.data.labels = rev.labels;
+                revenueChart.data.datasets[0].data = rev.data;
+                revenueChart.update();
+            }
+
+            // ===== Segment (phân nhóm) + Top website — gom từ orders trong range =====
+            const segs = {};            // segment → { customers:Set, revenue }
+            const webCount = {}, webRev = {};
             allCustomers.forEach(c => {
                 const seg = c.segment || 'N/A';
-                if (!segs[seg]) segs[seg] = { count: 0, revenue: 0 };
-                segs[seg].count += 1;
-                segs[seg].revenue += (c.revenue || 0);
-            });
-            const segOrder = ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'];
-            segmentData.labels = [];
-            segmentData.data = [];
-            segmentData.counts = [];
-            segOrder.forEach(name => {
-                if (segs[name]) {
-                    segmentData.labels.push(name);
-                    segmentData.data.push(segs[name].revenue);
-                    segmentData.counts.push(segs[name].count);
+                let custHasOrder = false;
+                (c.allOrders || []).forEach(o => {
+                    const ymd = parseDateToDay(o.date);
+                    if (ymd && !inRange(ymd)) return;
+                    custHasOrder = true;
+                    if (!segs[seg]) segs[seg] = { customers: new Set(), revenue: 0 };
+                    segs[seg].revenue += (o.amount || 0);
+                    if (o.website && o.website !== 'N/A') {
+                        webCount[o.website] = (webCount[o.website] || 0) + 1;
+                        webRev[o.website] = (webRev[o.website] || 0) + (o.amount || 0);
+                    }
+                });
+                if (custHasOrder) {
+                    if (!segs[seg]) segs[seg] = { customers: new Set(), revenue: 0 };
+                    segs[seg].customers.add(c.id);
                 }
             });
-            // Còn các segment khác (vd 'N/A')
-            Object.keys(segs).filter(s => !segOrder.includes(s)).forEach(name => {
-                segmentData.labels.push(name);
-                segmentData.data.push(segs[name].revenue);
-                segmentData.counts.push(segs[name].count);
-            });
 
+            const segOrder = ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'];
+            const segNames = [...segOrder.filter(s => segs[s]), ...Object.keys(segs).filter(s => !segOrder.includes(s))];
+            segmentData.labels = segNames;
+            segmentData.data = segNames.map(s => segs[s].revenue);
+            segmentData.counts = segNames.map(s => segs[s].customers.size);
             if (segmentChart) {
                 segmentChart.data.labels = segmentData.labels;
                 segmentChart.data.datasets[0].data = segmentData.data;
                 segmentChart.update();
             }
 
-            // Top 10 Website theo số đơn (tính từ allOrders)
-            const webCount = {}, webRev = {};
-            allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
-                if (!o.website || o.website === 'N/A') return;
-                webCount[o.website] = (webCount[o.website] || 0) + 1;
-                webRev[o.website] = (webRev[o.website] || 0) + (o.amount || 0);
-            }));
+            // Top 10 website theo số đơn
             const top = Object.entries(webCount)
                 .map(([name, orders]) => ({ name, orders, revenue: webRev[name] || 0 }))
                 .sort((a, b) => b.orders - a.orders).slice(0, 10);
             websiteData.labels = top.map(t => t.name);
             websiteData.orders = top.map(t => t.orders);
             websiteData.revenue = top.map(t => t.revenue);
-
             if (websiteChart) {
                 websiteChart.data.labels = websiteData.labels;
                 websiteChart.data.datasets[0].data = websiteData.orders;
@@ -1733,87 +1734,50 @@
             }
         }
 
-        // Tính revenue dataset cho chart từ allCustomers (week / month / year)
-        function getRevenueData(period) {
-            // Gom dailyData từ tất cả customers
-            const dailyTotal = {}; // { 'YYYY-MM-DD': revenue }
-            const monthlyTotal = {}; // { 'YYYY-MM': revenue }
+        // Build series doanh thu theo range. Tự chọn granularity: ≤62 ngày → theo ngày, dài hơn → theo tháng.
+        function buildRevenueSeries(range) {
+            const dailyTotal = {}; // ymd → revenue
+            allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                const ymd = parseDateToDay(o.date);
+                if (!ymd) return;
+                if (range && (ymd < range.from || ymd > range.to)) return;
+                dailyTotal[ymd] = (dailyTotal[ymd] || 0) + (o.amount || 0);
+            }));
+            const days = Object.keys(dailyTotal).sort();
+            if (days.length === 0) return { labels: [], data: [] };
 
-            allCustomers.forEach(customer => {
-                Object.entries(customer.dailyData || {}).forEach(([day, data]) => {
-                    dailyTotal[day] = (dailyTotal[day] || 0) + data.revenue;
+            const fromYmd = range ? range.from : days[0];
+            const toYmd = range ? range.to : days[days.length - 1];
+            const ymdToDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+            const spanDays = (ymdToDate(toYmd) - ymdToDate(fromYmd)) / 86400000;
+
+            const labels = [], data = [];
+            if (spanDays <= 62) {
+                // theo ngày
+                const cur = ymdToDate(fromYmd), end = ymdToDate(toYmd);
+                while (cur <= end) {
+                    const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+                    labels.push(`${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`);
+                    data.push(Math.round((dailyTotal[ymd] || 0) / 1e6 * 10) / 10);
+                    cur.setDate(cur.getDate() + 1);
+                }
+            } else {
+                // theo tháng
+                const monthTotal = {};
+                Object.entries(dailyTotal).forEach(([ymd, v]) => {
+                    const ym = ymd.slice(0, 7);
+                    monthTotal[ym] = (monthTotal[ym] || 0) + v;
                 });
-                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
-                    monthlyTotal[month] = (monthlyTotal[month] || 0) + data.revenue;
-                });
-            });
-
-            const dailyKeys = Object.keys(dailyTotal).sort();
-            const monthlyKeys = Object.keys(monthlyTotal).sort();
-
-            // Helper: thêm/trừ ngày từ "YYYY-MM-DD"
-            const addDays = (dayStr, days) => {
-                const [y, m, d] = dayStr.split('-').map(Number);
-                const dt = new Date(y, m - 1, d);
-                dt.setDate(dt.getDate() + days);
-                return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-            };
-
-            const formatDDMM = (dayStr) => {
-                const [y, m, d] = dayStr.split('-');
-                return `${d}/${m}`;
-            };
-
-            const formatMMYY = (monthStr) => {
-                const [y, m] = monthStr.split('-');
-                return `T${parseInt(m)}/${y.slice(2)}`;
-            };
-
-            if (period === 'week') {
-                // 7 ngày gần nhất (tính từ ngày cuối có data)
-                if (dailyKeys.length === 0) return { labels: [], data: [] };
-                const lastDay = dailyKeys[dailyKeys.length - 1];
-                const labels = [];
-                const data = [];
-                for (let i = 6; i >= 0; i--) {
-                    const day = addDays(lastDay, -i);
-                    labels.push(formatDDMM(day));
-                    data.push(Math.round((dailyTotal[day] || 0) / 1e6 * 10) / 10);
+                const cur = ymdToDate(fromYmd.slice(0, 7) + '-01');
+                const end = ymdToDate(toYmd.slice(0, 7) + '-01');
+                while (cur <= end) {
+                    const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+                    labels.push(`T${cur.getMonth() + 1}/${String(cur.getFullYear()).slice(2)}`);
+                    data.push(Math.round((monthTotal[ym] || 0) / 1e6));
+                    cur.setMonth(cur.getMonth() + 1);
                 }
-                return { labels, data };
             }
-
-            if (period === 'month') {
-                // 30 ngày gần nhất
-                if (dailyKeys.length === 0) return { labels: [], data: [] };
-                const lastDay = dailyKeys[dailyKeys.length - 1];
-                const labels = [];
-                const data = [];
-                for (let i = 29; i >= 0; i--) {
-                    const day = addDays(lastDay, -i);
-                    labels.push(formatDDMM(day));
-                    data.push(Math.round((dailyTotal[day] || 0) / 1e6 * 10) / 10);
-                }
-                return { labels, data };
-            }
-
-            if (period === 'year') {
-                // 12 tháng gần nhất
-                if (monthlyKeys.length === 0) return { labels: [], data: [] };
-                const lastMonth = monthlyKeys[monthlyKeys.length - 1];
-                const [y, m] = lastMonth.split('-').map(Number);
-                const labels = [];
-                const data = [];
-                for (let i = 11; i >= 0; i--) {
-                    const dt = new Date(y, m - 1 - i, 1);
-                    const monthKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-                    labels.push(formatMMYY(monthKey));
-                    data.push(Math.round((monthlyTotal[monthKey] || 0) / 1e6));
-                }
-                return { labels, data };
-            }
-
-            return { labels: [], data: [] };
+            return { labels, data };
         }
 
         // Chart 1: Doanh thu theo thời gian (Line Chart)
@@ -2006,35 +1970,6 @@
         }
 
         // Function để update Revenue Chart khi switch giữa Tuần/Tháng/Năm
-        function updateRevenueChart(period) {
-            if (!revenueChart) return;
-
-            // Update active button
-            document.querySelectorAll('.view-toggle .view-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            // Update chart data
-            const dataset = getRevenueData(period);
-            revenueChart.data.labels = dataset.labels;
-            revenueChart.data.datasets[0].data = dataset.data;
-            revenueChart.update('active');
-        }
-
-        // Refresh chart sau khi upload data mới
-        function refreshRevenueChart() {
-            if (!revenueChart) return;
-            // Lấy period đang active từ button
-            const activeBtn = document.querySelector('.view-toggle .view-btn.active');
-            const periodMap = { 'Tuần': 'week', 'Tháng': 'month', 'Năm': 'year' };
-            const period = activeBtn ? (periodMap[activeBtn.textContent.trim()] || 'week') : 'week';
-            const dataset = getRevenueData(period);
-            revenueChart.data.labels = dataset.labels;
-            revenueChart.data.datasets[0].data = dataset.data;
-            revenueChart.update();
-        }
-
         // ===== CUSTOMER DATA =====
         // Data sẽ được load từ localStorage hoặc từ Excel upload
         const allCustomers = [];
@@ -2133,7 +2068,6 @@
             populateAdvancedFilterDropdowns();
             applyFilters();
             renderDashboardStats();
-            refreshRevenueChart();
             refreshDashboardCharts();
             renderReports();
         }
@@ -2773,6 +2707,7 @@
                 dashboardRange = dashRangeFromPreset(period);
             }
             renderDashboardStats();
+            refreshDashboardCharts();
         }
 
         // Tính dashboard stats. range = {from,to} (YYYY-MM-DD) lọc theo khoảng; null = toàn thời gian.
@@ -3343,7 +3278,6 @@
             populateAdvancedFilterDropdowns();
             renderCustomerTable(allCustomers);
             renderDashboardStats();
-            refreshRevenueChart();
             refreshDashboardCharts();
             renderReports();
 
