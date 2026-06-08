@@ -2856,7 +2856,10 @@
         let currentReportPeriod = 'all';
         let customDateRange = null; // { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
 
-        // Tìm range ngày cho period
+        // Tìm range ngày cho period (theo KỲ LỊCH chứa ngày dữ liệu gần nhất)
+        //  - week : thứ 2 → chủ nhật
+        //  - month: ngày 1 → ngày cuối tháng
+        //  - year : 1/1 → 31/12
         function getReportDateRange(period) {
             if (period === 'custom') return customDateRange;
 
@@ -2871,15 +2874,23 @@
             if (!lastDayKey) return null;
 
             const [y, m, d] = lastDayKey.split('-').map(Number);
-            const lastDate = new Date(y, m - 1, d);
-            const fromDate = new Date(lastDate);
-
-            if (period === 'week') fromDate.setDate(fromDate.getDate() - 6);
-            else if (period === 'month') fromDate.setDate(fromDate.getDate() - 29);
-            else if (period === 'year') fromDate.setMonth(fromDate.getMonth() - 11);
-
             const toYMD = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-            return { from: toYMD(fromDate), to: lastDayKey };
+
+            if (period === 'week') {
+                const cur = new Date(y, m - 1, d);
+                const dow = cur.getDay();                 // 0=CN, 1=T2, ... 6=T7
+                const offsetToMon = dow === 0 ? 6 : dow - 1;
+                const mon = new Date(y, m - 1, d - offsetToMon);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                return { from: toYMD(mon), to: toYMD(sun) };
+            }
+            if (period === 'month') {
+                return { from: toYMD(new Date(y, m - 1, 1)), to: toYMD(new Date(y, m, 0)) };
+            }
+            if (period === 'year') {
+                return { from: `${y}-01-01`, to: `${y}-12-31` };
+            }
+            return null;
         }
 
         // Format YYYY-MM-DD → DD/MM/YYYY
@@ -2917,19 +2928,14 @@
                 customUI.style.display = 'none';
             }
 
-            // Update label
-            const labels = {
-                all: 'Tất cả thời gian',
-                week: '7 ngày gần nhất',
-                month: '30 ngày gần nhất',
-                year: '12 tháng gần nhất'
-            };
+            // Update label: hiển thị khoảng ngày thực tế (trừ "Tất cả")
             const labelEl = document.getElementById('reportPeriodLabel');
             if (labelEl) {
-                if (period === 'custom' && customDateRange) {
-                    labelEl.textContent = `Từ ${formatDateDDMMYYYY(customDateRange.from)} đến ${formatDateDDMMYYYY(customDateRange.to)}`;
+                if (period === 'all') {
+                    labelEl.textContent = 'Tất cả thời gian';
                 } else {
-                    labelEl.textContent = labels[period] || '';
+                    const r = period === 'custom' ? customDateRange : getReportDateRange(period);
+                    labelEl.textContent = r ? `Từ ${formatDateDDMMYYYY(r.from)} đến ${formatDateDDMMYYYY(r.to)}` : '';
                 }
             }
 
