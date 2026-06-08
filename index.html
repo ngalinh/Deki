@@ -2661,18 +2661,34 @@
             return last;
         }
 
-        // Preset → {from, to}
+        // Preset → {from, to} theo KỲ LỊCH chứa ngày dữ liệu gần nhất
+        //  - week : thứ 2 → chủ nhật của tuần chứa ngày đó
+        //  - month: ngày 1 → ngày cuối tháng (tự động 28/30/31)
+        //  - year : 1/1 → 31/12
         function dashRangeFromPreset(period) {
             if (period === 'all') return null;
             const last = getLatestDataDay();
             if (!last) return null;
             const [y, m, d] = last.split('-').map(Number);
-            const from = new Date(y, m - 1, d);
-            if (period === 'week') from.setDate(from.getDate() - 6);
-            else if (period === 'month') from.setDate(from.getDate() - 29);
-            else if (period === 'year') from.setMonth(from.getMonth() - 11);
             const toYMD = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-            return { from: toYMD(from), to: last };
+
+            if (period === 'week') {
+                const cur = new Date(y, m - 1, d);
+                const dow = cur.getDay();                 // 0=CN, 1=T2, ... 6=T7
+                const offsetToMon = dow === 0 ? 6 : dow - 1;
+                const mon = new Date(y, m - 1, d - offsetToMon);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                return { from: toYMD(mon), to: toYMD(sun) };
+            }
+            if (period === 'month') {
+                const first = new Date(y, m - 1, 1);
+                const lastDay = new Date(y, m, 0);        // ngày 0 của tháng sau = ngày cuối tháng này
+                return { from: toYMD(first), to: toYMD(lastDay) };
+            }
+            if (period === 'year') {
+                return { from: `${y}-01-01`, to: `${y}-12-31` };
+            }
+            return null;
         }
 
         // Khi đổi dropdown: auto-fill 2 ô ngày (trừ custom giữ nguyên cho user nhập)
