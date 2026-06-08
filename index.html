@@ -862,6 +862,24 @@
                 <div class="stat-card">
                     <div class="stat-header">
                         <div>
+                            <div class="stat-value" id="statNewCustomers">0</div>
+                            <div class="stat-label">Khách mới</div>
+                            <div class="stat-trend" id="newCustomersNote"></div>
+                        </div>
+                        <div class="stat-icon success">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <line x1="20" y1="8" x2="20" y2="14"></line>
+                                <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
                             <div class="stat-value" id="statTotalOrders">0</div>
                             <div class="stat-label">Tổng đơn hàng</div>
                             <div class="stat-trend" id="trendOrders"></div>
@@ -2705,6 +2723,19 @@
 
             // So sánh 2 tháng gần nhất
             const sortedMonths = Object.keys(monthlyTotals).sort();
+
+            // Khách mới: có đơn ĐẦU TIÊN (lần đầu xuất hiện toàn thời gian) rơi vào tháng gần nhất
+            const latestMonth = sortedMonths.length ? sortedMonths[sortedMonths.length - 1] : null;
+            let newCustomers = 0;
+            if (latestMonth) {
+                allCustomers.forEach(c => {
+                    const months = Object.keys(c.monthlyData || {});
+                    if (months.length === 0) return;
+                    const firstMonth = months.sort()[0];
+                    if (firstMonth === latestMonth) newCustomers++;
+                });
+            }
+
             let trends = null;
             if (sortedMonths.length >= 2) {
                 const lastMonth = sortedMonths[sortedMonths.length - 1];
@@ -2726,7 +2757,7 @@
                 };
             }
 
-            return { totalCustomers, totalOrders, totalRevenue, avgPerCustomer, trends };
+            return { totalCustomers, totalOrders, totalRevenue, avgPerCustomer, trends, newCustomers, latestMonth };
         }
 
         // Format số tiền: 19,760,000,000 → "19.76 tỷ"
@@ -3127,6 +3158,19 @@
             document.getElementById('statTotalOrders').textContent = stats.totalOrders.toLocaleString('vi-VN');
             document.getElementById('statTotalRevenue').textContent = formatMoney(stats.totalRevenue);
             document.getElementById('statAvgPerCustomer').textContent = formatMoney(stats.avgPerCustomer);
+
+            // Khách mới (đơn đầu tiên rơi vào tháng gần nhất)
+            const newCustEl = document.getElementById('statNewCustomers');
+            const newCustNote = document.getElementById('newCustomersNote');
+            if (newCustEl) newCustEl.textContent = (stats.newCustomers || 0).toLocaleString('vi-VN');
+            if (newCustNote) {
+                if (stats.latestMonth) {
+                    const [y, m] = stats.latestMonth.split('-');
+                    newCustNote.innerHTML = `<span style="color: var(--text-light); font-size: 12px;">trong tháng ${parseInt(m)}/${y}</span>`;
+                } else {
+                    newCustNote.innerHTML = '<span style="color: var(--text-light); font-size: 12px;">Chưa có dữ liệu</span>';
+                }
+            }
 
             // Update trends
             const t = stats.trends;
