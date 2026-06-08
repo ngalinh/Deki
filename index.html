@@ -839,6 +839,37 @@
                 </div>
             </div>
 
+            <!-- Date filter -->
+            <div class="filters" style="margin-bottom: 24px;">
+                <div style="display: flex; gap: 16px; align-items: end; flex-wrap: wrap;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Thời gian</label>
+                        <select class="filter-select" id="dashPeriod" onchange="onDashPeriodChange()" style="min-width: 160px;">
+                            <option value="all">Tất cả thời gian</option>
+                            <option value="week">7 ngày gần nhất</option>
+                            <option value="month">30 ngày gần nhất</option>
+                            <option value="year">12 tháng gần nhất</option>
+                            <option value="custom">Tùy chọn</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">📅 Từ ngày</label>
+                        <input type="date" id="dashFrom" class="filter-select">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">📅 Đến ngày</label>
+                        <input type="date" id="dashTo" class="filter-select">
+                    </div>
+                    <button class="btn btn-primary" onclick="applyDashboardFilter()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        Thống kê
+                    </button>
+                </div>
+            </div>
+
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -910,22 +941,6 @@
                     </div>
                 </div>
 
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div>
-                            <div class="stat-value" id="statAvgPerCustomer">0</div>
-                            <div class="stat-label">Giá trị TB/Khách</div>
-                            <div class="stat-trend" id="trendAvg"></div>
-                        </div>
-                        <div class="stat-icon secondary">
-                            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <line x1="18" y1="20" x2="18" y2="10"></line>
-                                <line x1="12" y1="20" x2="12" y2="4"></line>
-                                <line x1="6" y1="20" x2="6" y2="14"></line>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Charts -->
@@ -2700,64 +2715,163 @@
 
         // ===== DASHBOARD STATS CALCULATION =====
 
-        // Tính tổng stats + % so sánh tháng trước từ allCustomers
-        function calculateDashboardStats() {
-            // Aggregate monthly data across all customers
-            const monthlyTotals = {};
+        // ===== DASHBOARD DATE FILTER =====
+        let dashboardRange = null; // {from, to} hoặc null = toàn thời gian
+
+        // Tìm ngày mới nhất có đơn trong data
+        function getLatestDataDay() {
+            let last = null;
+            allCustomers.forEach(c => Object.keys(c.dailyData || {}).forEach(d => {
+                if (!last || d > last) last = d;
+            }));
+            return last;
+        }
+
+        // Preset → {from, to}
+        function dashRangeFromPreset(period) {
+            if (period === 'all') return null;
+            const last = getLatestDataDay();
+            if (!last) return null;
+            const [y, m, d] = last.split('-').map(Number);
+            const from = new Date(y, m - 1, d);
+            if (period === 'week') from.setDate(from.getDate() - 6);
+            else if (period === 'month') from.setDate(from.getDate() - 29);
+            else if (period === 'year') from.setMonth(from.getMonth() - 11);
+            const toYMD = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            return { from: toYMD(from), to: last };
+        }
+
+        // Khi đổi dropdown: auto-fill 2 ô ngày (trừ custom giữ nguyên cho user nhập)
+        function onDashPeriodChange() {
+            const period = document.getElementById('dashPeriod').value;
+            const fromEl = document.getElementById('dashFrom');
+            const toEl = document.getElementById('dashTo');
+            if (period === 'custom') return;
+            const r = dashRangeFromPreset(period);
+            fromEl.value = r ? r.from : '';
+            toEl.value = r ? r.to : '';
+        }
+
+        // Bấm "Thống kê" → set dashboardRange + render lại stat cards
+        function applyDashboardFilter() {
+            const period = document.getElementById('dashPeriod').value;
+            if (period === 'all') {
+                dashboardRange = null;
+            } else if (period === 'custom') {
+                const from = document.getElementById('dashFrom').value;
+                const to = document.getElementById('dashTo').value;
+                if (!from || !to) {
+                    showToast('error', 'Thiếu thông tin', 'Vui lòng chọn cả ngày bắt đầu và kết thúc');
+                    return;
+                }
+                if (from > to) {
+                    showToast('error', 'Ngày không hợp lệ', 'Ngày bắt đầu phải trước ngày kết thúc');
+                    return;
+                }
+                dashboardRange = { from, to };
+            } else {
+                dashboardRange = dashRangeFromPreset(period);
+            }
+            renderDashboardStats();
+        }
+
+        // Tính dashboard stats. range = {from,to} (YYYY-MM-DD) lọc theo khoảng; null = toàn thời gian.
+        function calculateDashboardStats(range) {
+            // Pre-compute firstOrderDate (toàn thời gian) cho mỗi khách → dùng tính "khách mới"
+            // và iterate orders 1 lần để gom theo range + theo tháng.
+            const monthlyTotals = {}; // cho trend month-over-month (chế độ không range)
+            let totalOrders = 0, totalRevenue = 0;
+            const custInRange = new Set();
+            let newCustomers = 0;
+
             allCustomers.forEach(customer => {
-                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
-                    if (!monthlyTotals[month]) {
-                        monthlyTotals[month] = { customers: new Set(), orders: 0, revenue: 0 };
+                // firstOrderDate toàn thời gian
+                let firstYmd = null;
+                let hasOrderInRange = false;
+                (customer.allOrders || []).forEach(o => {
+                    const ymd = parseDateToDay(o.date);
+                    if (!ymd) return;
+                    if (!firstYmd || ymd < firstYmd) firstYmd = ymd;
+
+                    const inRange = !range || (ymd >= range.from && ymd <= range.to);
+                    if (inRange) {
+                        hasOrderInRange = true;
+                        totalOrders += 1;
+                        totalRevenue += (o.amount || 0);
                     }
-                    monthlyTotals[month].customers.add(customer.name);
+                });
+
+                if (range) {
+                    if (hasOrderInRange) custInRange.add(customer.id);
+                    // Khách mới: đơn đầu tiên nằm trong range
+                    if (firstYmd && firstYmd >= range.from && firstYmd <= range.to) newCustomers++;
+                }
+
+                // monthly totals (chế độ không range, dùng cho trend + khách mới tháng gần nhất)
+                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
+                    if (!monthlyTotals[month]) monthlyTotals[month] = { customers: new Set(), orders: 0, revenue: 0 };
+                    monthlyTotals[month].customers.add(customer.id);
                     monthlyTotals[month].orders += data.orders;
                     monthlyTotals[month].revenue += data.revenue;
                 });
             });
 
-            // Totals
-            const totalCustomers = allCustomers.length;
-            const totalOrders = allCustomers.reduce((sum, c) => sum + c.orders, 0);
-            const totalRevenue = allCustomers.reduce((sum, c) => sum + c.revenue, 0);
-            const avgPerCustomer = totalCustomers ? totalRevenue / totalCustomers : 0;
-
-            // So sánh 2 tháng gần nhất
             const sortedMonths = Object.keys(monthlyTotals).sort();
 
-            // Khách mới: có đơn ĐẦU TIÊN (lần đầu xuất hiện toàn thời gian) rơi vào tháng gần nhất
+            // ===== Chế độ có RANGE filter =====
+            if (range) {
+                const periodLabel = `Từ ${formatDateDDMMYYYY(range.from)} đến ${formatDateDDMMYYYY(range.to)}`;
+                return {
+                    range,
+                    periodLabel,
+                    totalCustomers: custInRange.size,
+                    totalOrders,
+                    totalRevenue,
+                    newCustomers,
+                    trends: null
+                };
+            }
+
+            // ===== Chế độ TOÀN THỜI GIAN (mặc định) =====
+            const totalCustomers = allCustomers.length;
+            const grandOrders = allCustomers.reduce((s, c) => s + (c.orders || 0), 0);
+            const grandRevenue = allCustomers.reduce((s, c) => s + (c.revenue || 0), 0);
+
+            // Khách mới: đơn đầu tiên rơi vào tháng gần nhất
             const latestMonth = sortedMonths.length ? sortedMonths[sortedMonths.length - 1] : null;
-            let newCustomers = 0;
+            let newCustAllTime = 0;
             if (latestMonth) {
                 allCustomers.forEach(c => {
                     const months = Object.keys(c.monthlyData || {});
                     if (months.length === 0) return;
-                    const firstMonth = months.sort()[0];
-                    if (firstMonth === latestMonth) newCustomers++;
+                    if (months.sort()[0] === latestMonth) newCustAllTime++;
                 });
             }
+            const periodLabel = latestMonth
+                ? `trong tháng ${parseInt(latestMonth.split('-')[1])}/${latestMonth.split('-')[0]}`
+                : 'Chưa có dữ liệu';
 
             let trends = null;
             if (sortedMonths.length >= 2) {
-                const lastMonth = sortedMonths[sortedMonths.length - 1];
-                const prevMonth = sortedMonths[sortedMonths.length - 2];
-                const last = monthlyTotals[lastMonth];
-                const prev = monthlyTotals[prevMonth];
-
+                const last = monthlyTotals[sortedMonths[sortedMonths.length - 1]];
+                const prev = monthlyTotals[sortedMonths[sortedMonths.length - 2]];
                 const pctChange = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
-                const lastAvg = last.customers.size ? last.revenue / last.customers.size : 0;
-                const prevAvg = prev.customers.size ? prev.revenue / prev.customers.size : 0;
-
                 trends = {
                     customers: pctChange(last.customers.size, prev.customers.size),
                     orders: pctChange(last.orders, prev.orders),
-                    revenue: pctChange(last.revenue, prev.revenue),
-                    avg: pctChange(lastAvg, prevAvg),
-                    lastMonth: lastMonth,
-                    prevMonth: prevMonth
+                    revenue: pctChange(last.revenue, prev.revenue)
                 };
             }
 
-            return { totalCustomers, totalOrders, totalRevenue, avgPerCustomer, trends, newCustomers, latestMonth };
+            return {
+                range: null,
+                periodLabel,
+                totalCustomers,
+                totalOrders: grandOrders,
+                totalRevenue: grandRevenue,
+                newCustomers: newCustAllTime,
+                trends
+            };
         }
 
         // Format số tiền: 19,760,000,000 → "19.76 tỷ"
@@ -3150,34 +3264,29 @@
             }
         }
 
-        // Render Dashboard stats từ allCustomers
+        // Render Dashboard stats từ allCustomers (theo dashboardRange nếu có)
         function renderDashboardStats() {
-            const stats = calculateDashboardStats();
+            const stats = calculateDashboardStats(dashboardRange);
 
             document.getElementById('statTotalCustomers').textContent = stats.totalCustomers.toLocaleString('vi-VN');
             document.getElementById('statTotalOrders').textContent = stats.totalOrders.toLocaleString('vi-VN');
             document.getElementById('statTotalRevenue').textContent = formatMoney(stats.totalRevenue);
-            document.getElementById('statAvgPerCustomer').textContent = formatMoney(stats.avgPerCustomer);
 
-            // Khách mới (đơn đầu tiên rơi vào tháng gần nhất)
+            // Khách mới
             const newCustEl = document.getElementById('statNewCustomers');
             const newCustNote = document.getElementById('newCustomersNote');
             if (newCustEl) newCustEl.textContent = (stats.newCustomers || 0).toLocaleString('vi-VN');
-            if (newCustNote) {
-                if (stats.latestMonth) {
-                    const [y, m] = stats.latestMonth.split('-');
-                    newCustNote.innerHTML = `<span style="color: var(--text-light); font-size: 12px;">trong tháng ${parseInt(m)}/${y}</span>`;
-                } else {
-                    newCustNote.innerHTML = '<span style="color: var(--text-light); font-size: 12px;">Chưa có dữ liệu</span>';
-                }
-            }
+            if (newCustNote) newCustNote.innerHTML = `<span style="color: var(--text-light); font-size: 12px;">${stats.periodLabel || ''}</span>`;
 
-            // Update trends
+            // Update trends (chỉ khi chế độ tổng — không có range filter)
             const t = stats.trends;
-            document.getElementById('trendCustomers').outerHTML = `<div id="trendCustomers">${renderTrend(t?.customers)}</div>`;
-            document.getElementById('trendOrders').outerHTML = `<div id="trendOrders">${renderTrend(t?.orders)}</div>`;
-            document.getElementById('trendRevenue').outerHTML = `<div id="trendRevenue">${renderTrend(t?.revenue)}</div>`;
-            document.getElementById('trendAvg').outerHTML = `<div id="trendAvg">${renderTrend(t?.avg)}</div>`;
+            const setTrend = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.outerHTML = `<div class="stat-trend" id="${id}">${stats.range ? '' : renderTrend(val)}</div>`;
+            };
+            setTrend('trendCustomers', t?.customers);
+            setTrend('trendOrders', t?.orders);
+            setTrend('trendRevenue', t?.revenue);
         }
 
         // Re-populate website filter sau khi merge
