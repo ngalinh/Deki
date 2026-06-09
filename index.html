@@ -1099,13 +1099,10 @@
                         <thead>
                             <tr>
                                 <th>Khách hàng</th>
-                                <th>SĐT</th>
                                 <th>Phân nhóm</th>
-                                <th>Brand</th>
-                                <th>Nhân viên</th>
-                                <th>Số đơn</th>
                                 <th>Doanh thu</th>
-                                <th>Website</th>
+                                <th>SL đơn hàng</th>
+                                <th>Đơn gần nhất</th>
                             </tr>
                         </thead>
                         <tbody id="customers-table-body"></tbody>
@@ -2465,7 +2462,7 @@
                 const message = hasAnyData
                     ? 'Không tìm thấy khách hàng phù hợp với bộ lọc'
                     : 'Chưa có dữ liệu. Vui lòng click <strong>"Cập nhật từ Excel"</strong> để upload file DS_DONHANG.xlsx';
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 48px; color: var(--text-light);">${message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 48px; color: var(--text-light);">${message}</td></tr>`;
                 renderPagination(0);
                 return;
             }
@@ -2483,29 +2480,20 @@
                     .toLowerCase()
                     .replace(/\s+/g, '-');
 
-                const brandsText = (customer.brands || []).join(', ') || '-';
-                const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
-                const employeesText = employees.length === 0 ? '-'
-                    : employees.length === 1 ? employees[0]
-                    : `${employees[0]} +${employees.length - 1}`;
+                // Đơn gần nhất = ngày đơn lớn nhất
+                let lastOrder = '';
+                (customer.allOrders || []).forEach(o => {
+                    const ymd = parseDateToDay(o.date);
+                    if (ymd && (!lastOrder || ymd > lastOrder)) lastOrder = ymd;
+                });
 
                 return `
                     <tr onclick="showCustomerDetail('${customer.id}')">
                         <td class="customer-name">${customer.name}</td>
-                        <td style="color: var(--text-gray);">${customer.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
-                        <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
-                        <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
+                        <td style="font-weight:600;">${customer.revenue.toLocaleString('vi-VN')} đ</td>
                         <td>${customer.orders}</td>
-                        <td>${customer.revenue.toLocaleString('vi-VN')} đ</td>
-                        <td class="websites-tag">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="2" y1="12" x2="22" y2="12"></line>
-                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                            </svg>
-                            ${customer.websites.length} websites
-                        </td>
+                        <td style="color: var(--text-gray);">${lastOrder ? fmtDateVN(lastOrder) : '-'}</td>
                     </tr>
                 `;
             }).join('');
