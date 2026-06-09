@@ -1012,63 +1012,121 @@
                 </div>
             </div>
 
-            <!-- Filters -->
-            <div class="filters">
-                <div class="filters-row">
-                    <div class="search-box">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="m21 21-4.35-4.35"></path>
-                        </svg>
-                        <input type="text" id="searchInput" placeholder="Tìm theo tên hoặc SĐT...">
+            <!-- Sub-tabs -->
+            <div class="view-toggle" style="margin-bottom: 20px; display: inline-flex;">
+                <button class="view-btn active" id="custTabAll" onclick="switchCustTab('all')">Tất cả</button>
+                <button class="view-btn" id="custTabLe" onclick="switchCustTab('le')">Khách lẻ</button>
+                <button class="view-btn" id="custTabCtv" onclick="switchCustTab('ctv')">Khách CTV</button>
+                <button class="view-btn" id="custTabSi" onclick="switchCustTab('si')">Khách sỉ</button>
+            </div>
+
+            <!-- ===== TAB: Tất cả ===== -->
+            <div id="cust-all">
+                <div class="filters">
+                    <div class="filters-row">
+                        <div class="search-box">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" id="searchInput" placeholder="Tìm theo tên hoặc SĐT...">
+                        </div>
+
+                        <select class="filter-select" id="allTimeFilter" onchange="applyFilters()">
+                            <option value="all">Tất cả thời gian</option>
+                            <option value="3m">3 tháng</option>
+                            <option value="6m">6 tháng</option>
+                            <option value="12m">1 năm</option>
+                        </select>
+
+                        <select class="filter-select" id="segmentFilter">
+                            <option value="">Tất cả phân nhóm</option>
+                            <option value="Sỉ vừa">Sỉ vừa</option>
+                            <option value="Khách Lẻ">Khách Lẻ</option>
+                            <option value="CTV">CTV</option>
+                            <option value="Sỉ to">Sỉ to</option>
+                            <option value="Sỉ nhỏ">Sỉ nhỏ</option>
+                        </select>
+
+                        <select class="filter-select" id="websiteFilter">
+                            <option value="">Tất cả website</option>
+                        </select>
+
+                        <select class="filter-select" id="employeeFilter">
+                            <option value="">Tất cả nhân viên</option>
+                        </select>
                     </div>
+                </div>
 
-                    <select class="filter-select" id="segmentFilter">
-                        <option value="">Tất cả phân nhóm</option>
-                        <option value="Sỉ vừa">Sỉ vừa</option>
-                        <option value="Khách Lẻ">Khách Lẻ</option>
-                        <option value="CTV">CTV</option>
-                        <option value="Sỉ to">Sỉ to</option>
-                        <option value="Sỉ nhỏ">Sỉ nhỏ</option>
-                    </select>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Khách hàng</th>
+                                <th>SĐT</th>
+                                <th>Phân nhóm</th>
+                                <th>Brand</th>
+                                <th>Nhân viên</th>
+                                <th>Số đơn</th>
+                                <th>Doanh thu</th>
+                                <th>Website</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-table-body"></tbody>
+                    </table>
+                </div>
 
-                    <select class="filter-select" id="websiteFilter">
-                        <option value="">Tất cả website</option>
-                    </select>
-
-                    <select class="filter-select" id="employeeFilter">
-                        <option value="">Tất cả nhân viên</option>
-                    </select>
+                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: var(--text-gray); font-size: 14px;" id="paginationInfo">
+                        Hiển thị 1-10 trong tổng số 0 khách hàng
+                    </div>
+                    <div style="display: flex; gap: 8px;" id="paginationControls"></div>
                 </div>
             </div>
 
-            <!-- Table -->
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Khách hàng</th>
-                            <th>SĐT</th>
-                            <th>Phân nhóm</th>
-                            <th>Brand</th>
-                            <th>Nhân viên</th>
-                            <th>Số đơn</th>
-                            <th>Doanh thu</th>
-                            <th>Website</th>
-                        </tr>
-                    </thead>
-                    <tbody id="customers-table-body"></tbody>
-                </table>
-            </div>
+            <!-- ===== TAB: Khách lẻ / CTV / Sỉ (dùng chung) ===== -->
+            <div id="cust-segment" class="section-hidden">
+                <div class="filters">
+                    <div class="filters-row">
+                        <div class="search-box">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" id="segSearch" placeholder="Tìm theo tên hoặc SĐT..." oninput="renderSegmentTable()">
+                        </div>
+                        <select class="filter-select" id="segTimeFilter" onchange="renderSegmentTable()" title="Lọc đơn theo thời gian">
+                            <option value="all">Tất cả thời gian</option>
+                            <option value="month">Trong tháng</option>
+                            <option value="3m">3 tháng</option>
+                            <option value="6m">6 tháng</option>
+                            <option value="12m">1 năm</option>
+                        </select>
+                        <select class="filter-select" id="segLastOrderFilter" onchange="renderSegmentTable()" title="Lọc theo đơn gần nhất">
+                            <option value="all">Đơn gần nhất: tất cả</option>
+                            <option value="month">Đơn gần nhất: trong tháng</option>
+                            <option value="3m">Đơn gần nhất: 3 tháng</option>
+                            <option value="6m">Đơn gần nhất: 6 tháng</option>
+                            <option value="12m">Đơn gần nhất: 1 năm</option>
+                        </select>
+                        <div style="position: relative;">
+                            <button class="btn btn-secondary" type="button" onclick="toggleSegWebsiteDropdown(event)" id="segWebsiteBtn">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                                Website (<span id="segWebsiteCount">tất cả</span>)
+                            </button>
+                            <div id="segWebsiteDropdown" style="display:none; position:absolute; top:110%; left:0; z-index:60; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.12); max-height:280px; overflow:auto; min-width:240px; padding:8px;"></div>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Pagination -->
-            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="color: var(--text-gray); font-size: 14px;" id="paginationInfo">
-                    Hiển thị 1-10 trong tổng số 0 khách hàng
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr id="segTableHead"></tr>
+                        </thead>
+                        <tbody id="segTableBody"></tbody>
+                    </table>
                 </div>
-                <div style="display: flex; gap: 8px;" id="paginationControls">
-                    <!-- Dynamic content -->
-                </div>
+                <div style="margin-top: 12px; color: var(--text-gray); font-size: 14px;" id="segCount"></div>
             </div>
         </div>
 
@@ -2570,29 +2628,46 @@
         }
 
         // Apply filters
+        // Helper: tính {from,to} (YYYY-MM-DD) theo preset, dựa trên ngày dữ liệu gần nhất
+        //   all → null | month → tháng lịch | 3m/6m/12m → lùi N tháng từ ngày gần nhất
+        function customerPresetRange(preset) {
+            if (!preset || preset === 'all') return null;
+            let last = null;
+            allCustomers.forEach(c => Object.keys(c.dailyData || {}).forEach(d => { if (!last || d > last) last = d; }));
+            if (!last) return null;
+            const [y, m, d] = last.split('-').map(Number);
+            const toYMD = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            if (preset === 'month') return { from: toYMD(new Date(y, m - 1, 1)), to: toYMD(new Date(y, m, 0)) };
+            const back = { '3m': 3, '6m': 6, '12m': 12 }[preset];
+            if (back) { const f = new Date(y, m - 1, d); f.setMonth(f.getMonth() - back); return { from: toYMD(f), to: last }; }
+            return null;
+        }
+
         function applyFilters() {
             const rawSearch = document.getElementById('searchInput').value.trim();
             const searchTerm = removeDiacritics(rawSearch).toLowerCase();
             const segmentFilter = document.getElementById('segmentFilter').value;
             const websiteFilter = document.getElementById('websiteFilter').value;
             const employeeFilter = document.getElementById('employeeFilter').value;
+            const timeRange = customerPresetRange(document.getElementById('allTimeFilter')?.value);
 
             filteredCustomers = allCustomers.filter(customer => {
-                // Search filter: tìm theo tên (bỏ dấu) hoặc SĐT
                 const nameNoDiacritics = removeDiacritics(customer.name).toLowerCase();
                 const phone = (customer.phone || '').toLowerCase();
                 const matchSearch = !searchTerm || nameNoDiacritics.includes(searchTerm) || phone.includes(searchTerm);
-
-                // Segment filter
                 const matchSegment = !segmentFilter || customer.segment === segmentFilter;
-
-                // Website filter
                 const matchWebsite = !websiteFilter || customer.websites.includes(websiteFilter);
-
-                // Employee filter
                 const matchEmployee = !employeeFilter || (customer.employees || []).includes(employeeFilter);
 
-                return matchSearch && matchSegment && matchWebsite && matchEmployee;
+                // Lọc thời gian: chỉ giữ khách có ≥1 đơn trong khoảng
+                let matchTime = true;
+                if (timeRange) {
+                    matchTime = (customer.allOrders || []).some(o => {
+                        const ymd = parseDateToDay(o.date);
+                        return ymd && ymd >= timeRange.from && ymd <= timeRange.to;
+                    });
+                }
+                return matchSearch && matchSegment && matchWebsite && matchEmployee && matchTime;
             });
 
             currentPage = 1;
@@ -2606,6 +2681,172 @@
             if (countElement) {
                 countElement.textContent = `${filteredCustomers.length} khách hàng`;
             }
+        }
+
+        // ===== SUB-TABS KHÁCH HÀNG (Tất cả / Lẻ / CTV / Sỉ) =====
+        let custTab = 'all';
+        // Map tab → segments
+        const SEGMENT_MAP = {
+            le: ['Khách Lẻ'],
+            ctv: ['CTV'],
+            si: ['Sỉ nhỏ', 'Sỉ vừa', 'Sỉ to']
+        };
+        let segSort = { col: 'revenue', dir: 'desc' };   // cột sort hiện tại
+        let segSelectedWebsites = [];                     // website đang chọn (multi)
+
+        function switchCustTab(tab) {
+            custTab = tab;
+            ['all', 'le', 'ctv', 'si'].forEach(t => {
+                const btn = document.getElementById('custTab' + (t === 'all' ? 'All' : t === 'le' ? 'Le' : t === 'ctv' ? 'Ctv' : 'Si'));
+                if (btn) btn.classList.toggle('active', t === tab);
+            });
+            document.getElementById('cust-all').classList.toggle('section-hidden', tab !== 'all');
+            document.getElementById('cust-segment').classList.toggle('section-hidden', tab === 'all');
+            if (tab !== 'all') {
+                segSelectedWebsites = [];
+                segSort = { col: 'revenue', dir: 'desc' };
+                buildSegWebsiteDropdown();
+                document.getElementById('segWebsiteCount').textContent = 'tất cả';
+                document.getElementById('segSearch').value = '';
+                renderSegmentTable();
+            }
+        }
+
+        // Website multi-select dropdown
+        function buildSegWebsiteDropdown() {
+            const segs = SEGMENT_MAP[custTab] || [];
+            const websites = new Set();
+            allCustomers.forEach(c => {
+                if (!segs.includes(c.segment)) return;
+                (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); });
+            });
+            const list = Array.from(websites).sort();
+            const box = document.getElementById('segWebsiteDropdown');
+            box.innerHTML = list.length === 0
+                ? '<div style="color:var(--text-light); font-size:13px; padding:8px;">Không có website</div>'
+                : list.map(w => `<label style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer;">
+                       <input type="checkbox" value="${w}" onchange="onSegWebsiteToggle(this)" ${segSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
+                   </label>`).join('');
+        }
+
+        function toggleSegWebsiteDropdown(e) {
+            e.stopPropagation();
+            const box = document.getElementById('segWebsiteDropdown');
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        }
+        document.addEventListener('click', (e) => {
+            const dd = document.getElementById('segWebsiteDropdown');
+            const btn = document.getElementById('segWebsiteBtn');
+            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+                dd.style.display = 'none';
+            }
+        });
+
+        function onSegWebsiteToggle(cb) {
+            if (cb.checked) { if (!segSelectedWebsites.includes(cb.value)) segSelectedWebsites.push(cb.value); }
+            else segSelectedWebsites = segSelectedWebsites.filter(w => w !== cb.value);
+            document.getElementById('segWebsiteCount').textContent = segSelectedWebsites.length ? segSelectedWebsites.length + ' web' : 'tất cả';
+            renderSegmentTable();
+        }
+
+        function segSortBy(col) {
+            if (segSort.col === col) segSort.dir = segSort.dir === 'desc' ? 'asc' : 'desc';
+            else segSort = { col, dir: 'desc' };
+            renderSegmentTable();
+        }
+
+        function renderSegmentTable() {
+            if (custTab === 'all') return;
+            const segs = SEGMENT_MAP[custTab] || [];
+            const isSi = custTab === 'si';
+            const timeRange = customerPresetRange(document.getElementById('segTimeFilter').value);
+            const lastRange = customerPresetRange(document.getElementById('segLastOrderFilter').value);
+            const q = removeDiacritics((document.getElementById('segSearch').value || '').trim()).toLowerCase();
+            const webSet = segSelectedWebsites;
+
+            // Tính metrics theo filter cho từng khách thuộc segment
+            const rows = [];
+            allCustomers.forEach(c => {
+                if (!segs.includes(c.segment)) return;
+                if (q && !removeDiacritics(c.name).toLowerCase().includes(q) && !(c.phone || '').includes(q)) return;
+
+                let orders = 0, revenue = 0, lastOrder = '';
+                const websitesSet = new Set();
+                (c.allOrders || []).forEach(o => {
+                    const ymd = parseDateToDay(o.date);
+                    if (ymd && (!lastOrder || ymd > lastOrder)) lastOrder = ymd; // đơn gần nhất (toàn bộ)
+                    // áp filter thời gian + website cho metrics
+                    if (timeRange && (!ymd || ymd < timeRange.from || ymd > timeRange.to)) return;
+                    if (webSet.length && !webSet.includes(o.website)) return;
+                    orders += 1;
+                    revenue += (o.amount || 0);
+                    if (o.website && o.website !== 'N/A') websitesSet.add(o.website);
+                });
+
+                if (orders === 0) return; // không có đơn thỏa filter → ẩn
+                // filter theo đơn gần nhất
+                if (lastRange && (!lastOrder || lastOrder < lastRange.from || lastOrder > lastRange.to)) return;
+
+                rows.push({
+                    id: c.id, name: c.name, segment: c.segment,
+                    websites: webSet.length ? Array.from(websitesSet) : (c.websites || []).filter(w => w && w !== 'N/A'),
+                    orders, revenue, avg: orders ? revenue / orders : 0, lastOrder
+                });
+            });
+
+            // Sort
+            const dir = segSort.dir === 'desc' ? -1 : 1;
+            rows.sort((a, b) => {
+                let va, vb;
+                if (segSort.col === 'orders') { va = a.orders; vb = b.orders; }
+                else if (segSort.col === 'avg') { va = a.avg; vb = b.avg; }
+                else if (segSort.col === 'last') { va = a.lastOrder || ''; vb = b.lastOrder || ''; return dir * (va < vb ? -1 : va > vb ? 1 : 0); }
+                else { va = a.revenue; vb = b.revenue; }
+                return dir * (va - vb);
+            });
+
+            // Header với icon sort
+            const sortIcon = (col) => {
+                const active = segSort.col === col;
+                const arrow = active ? (segSort.dir === 'desc' ? '▾' : '▴') : '⇅';
+                return `<span style="cursor:pointer; user-select:none; color:${active ? 'var(--primary)' : 'var(--text-light)'};" onclick="segSortBy('${col}')"> ${arrow}</span>`;
+            };
+            document.getElementById('segTableHead').innerHTML = `
+                <th>Khách hàng</th>
+                ${isSi ? '<th>Loại khách</th>' : ''}
+                <th>Websites</th>
+                <th>SL đơn hàng${sortIcon('orders')}</th>
+                <th>Tổng doanh thu${sortIcon('revenue')}</th>
+                <th>Doanh thu TB${sortIcon('avg')}</th>
+                <th>Đơn gần nhất${sortIcon('last')}</th>
+                <th>Ghi chú</th>`;
+
+            const tbody = document.getElementById('segTableBody');
+            const colspan = isSi ? 8 : 7;
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding:40px; color:var(--text-light);">Không có khách hàng phù hợp</td></tr>`;
+                document.getElementById('segCount').textContent = '';
+                return;
+            }
+            tbody.innerHTML = rows.map(r => {
+                const webChips = r.websites.length
+                    ? `<span class="websites-tag"><svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg> ${r.websites.length} web</span>
+                       <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.join(', ')}">${r.websites.join(', ')}</div>`
+                    : '-';
+                const segBadge = isSi ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
+                return `
+                    <tr onclick="showCustomerDetail('${r.id}')" style="cursor:pointer;">
+                        <td class="customer-name">${r.name}</td>
+                        ${segBadge}
+                        <td>${webChips}</td>
+                        <td>${r.orders.toLocaleString('vi-VN')}</td>
+                        <td style="font-weight:600;">${r.revenue.toLocaleString('vi-VN')} đ</td>
+                        <td>${Math.round(r.avg).toLocaleString('vi-VN')} đ</td>
+                        <td style="color:var(--text-gray);">${r.lastOrder ? fmtDateVN(r.lastOrder) : '-'}</td>
+                        <td style="color:var(--text-light);">-</td>
+                    </tr>`;
+            }).join('');
+            document.getElementById('segCount').textContent = `${rows.length} khách hàng`;
         }
 
         // ===== EXCEL UPLOAD FUNCTIONALITY =====
