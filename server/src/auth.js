@@ -6,6 +6,11 @@ const BASSO_AUTH_URL = process.env.BASSO_AUTH_URL || 'https://ai.basso.vn/platfo
 const CACHE_TTL_MS = 30 * 1000;
 const SUPER_ADMIN_EMAIL = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().trim();
 
+// DEV mode: chạy local KHÔNG cần cookie basso.vn. Bật bằng DEKI_DEV_MODE=1 trong .env.
+// Khi bật → mọi request coi như super admin (dev@local). TUYỆT ĐỐI không bật trên production.
+const DEV_MODE = process.env.DEKI_DEV_MODE === '1';
+const DEV_USER = { email: SUPER_ADMIN_EMAIL || 'dev@local', name: 'Dev (local)', staffName: null, roles: ['admin'], isDekiAdmin: true };
+
 const sessionCache = new Map();
 
 function hashCookie(cookie) {
@@ -83,6 +88,7 @@ async function isDekiAdmin(email) {
 
 function requireAuth() {
     return async (req, res, next) => {
+        if (DEV_MODE) { req.user = { ...DEV_USER }; return next(); }
         const cookie = req.headers.cookie || '';
         const user = await verifyBassoSession(cookie);
         if (!user) {
@@ -127,4 +133,7 @@ function requireApiKey() {
     };
 }
 
-module.exports = { verifyBassoSession, requireAuth, requireApiKey, hasAccess, isDekiAdmin, clearSessionCache };
+module.exports = {
+    verifyBassoSession, requireAuth, requireApiKey, hasAccess, isDekiAdmin, clearSessionCache,
+    DEV_MODE, getDevUser: () => ({ ...DEV_USER })
+};

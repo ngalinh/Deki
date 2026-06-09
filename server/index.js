@@ -7,7 +7,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 
 const db = require('./src/db');
-const { requireAuth, requireApiKey, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache } = require('./src/auth');
+const { requireAuth, requireApiKey, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache, DEV_MODE, getDevUser } = require('./src/auth');
 const { runMigrations } = require('./src/migrate');
 
 const app = express();
@@ -37,6 +37,7 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 // ===== Auth: /api/me =====
 // Frontend tự gọi để check login + lấy roles + isDekiAdmin
 app.get('/api/me', async (req, res) => {
+    if (DEV_MODE) return res.json({ success: true, user: getDevUser() });
     const cookie = req.headers.cookie || '';
     const user = await verifyBassoSession(cookie);
     if (!user) {
