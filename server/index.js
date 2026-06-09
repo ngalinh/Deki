@@ -522,6 +522,51 @@ app.post('/api/partner/segments-by-phones', requireApiKey(), async (req, res) =>
     }
 });
 
+// ===== ĐƠN HÀNG: danh sách đơn (như Excel) + lọc nhân viên/thời gian + phân trang =====
+app.get('/api/orders', requireAuth(), async (req, res) => {
+    try {
+        const isAdmin = !!req.user.isDekiAdmin;
+        const staffName = req.user.staffName;
+        if (!isAdmin && !staffName) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
+
+        const where = [], params = [];
+        if (isAdmin) {
+            if (req.query.employee) { where.push('o.employee = ?'); params.push(req.query.employee); }
+        } else {
+            where.push('o.employee = ?'); params.push(staffName);
+        }
+        if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
+        if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }
+        const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize) || 50));
+        const offset = (page - 1) * pageSize;
+
+        const totalRow = await db.query(`SELECT COUNT(*) AS cnt FROM deki_orders o ${whereSql}`, params);
+        const total = Number(totalRow[0]?.cnt) || 0;
+
+        // LIMIT/OFFSET inline (đã validate là số nguyên → an toàn)
+        const rows = await db.query(
+            `SELECT DATE_FORMAT(o.order_date,'%d-%m-%Y') AS date, o.order_code AS code,
+                    c.name AS customer, c.phone AS phone, c.segment AS segment,
+                    o.brand, o.employee, o.website, o.amount
+             FROM deki_orders o JOIN deki_customers c ON c.id = o.customer_id
+             ${whereSql} ORDER BY o.order_date DESC, o.id DESC
+             LIMIT ${pageSize} OFFSET ${offset}`,
+            params
+        );
+        res.json({
+            success: true,
+            data: rows.map(r => ({ ...r, amount: Number(r.amount) || 0 })),
+            total, page, pageSize
+        });
+    } catch (e) {
+        console.error('[api/orders] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ===== CÔNG VIỆC: Follow khách =====
 
 // GET /api/follow - list follow customers (kèm tags, history, cờ "đã mua hàng")

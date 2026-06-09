@@ -808,6 +808,15 @@
                 Khách hàng
             </a>
 
+            <a href="#" class="nav-item" onclick="showView('orders')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                Đơn hàng
+            </a>
+
             <a href="#" class="nav-item section-hidden" id="navAdmin" onclick="showView('admin')">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 1l3 6 6 .9-4.5 4.4 1 6.2L12 15.8 6.5 18.5l1-6.2L3 7.9 9 7z"></path>
@@ -1111,6 +1120,62 @@
                     </table>
                 </div>
                 <div style="margin-top: 12px; color: var(--text-gray); font-size: 14px;" id="segCount"></div>
+            </div>
+        </div>
+
+        <!-- Đơn hàng View -->
+        <div id="orders-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Danh sách đơn hàng</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;" id="ordersCount">0 đơn hàng</p>
+                </div>
+            </div>
+
+            <div class="filters">
+                <div class="filters-row">
+                    <select class="filter-select" id="ordEmployee" onchange="loadOrders(1)">
+                        <option value="">Tất cả nhân viên</option>
+                    </select>
+                    <select class="filter-select" id="ordTime" onchange="onOrdTimeChange()">
+                        <option value="all">Tất cả thời gian</option>
+                        <option value="month">Trong tháng</option>
+                        <option value="3m">3 tháng</option>
+                        <option value="6m">6 tháng</option>
+                        <option value="12m">1 năm</option>
+                        <option value="custom">Tùy chọn</option>
+                    </select>
+                    <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
+                        <input type="date" id="ordFrom" class="filter-select">
+                        <span style="color:var(--text-light);">→</span>
+                        <input type="date" id="ordTo" class="filter-select">
+                        <button class="btn btn-primary" onclick="loadOrders(1)">Lọc</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Mã đơn</th>
+                            <th>Khách hàng</th>
+                            <th>SĐT</th>
+                            <th>Brand</th>
+                            <th>Phân nhóm</th>
+                            <th>Nhân viên</th>
+                            <th>Website</th>
+                            <th>Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody"></tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: var(--text-gray); font-size: 14px;" id="ordPaginationInfo"></div>
+                <div style="display: flex; gap: 8px;" id="ordPaginationControls"></div>
             </div>
         </div>
 
@@ -1475,6 +1540,7 @@
             document.getElementById('filters-view').classList.add('section-hidden');
             document.getElementById('admin-view')?.classList.add('section-hidden');
             document.getElementById('congviec-view')?.classList.add('section-hidden');
+            document.getElementById('orders-view')?.classList.add('section-hidden');
 
             // Show selected view
             document.getElementById(viewName + '-view').classList.remove('section-hidden');
@@ -1482,6 +1548,7 @@
             // Lazy-load data cho admin view
             if (viewName === 'admin') loadPermissions();
             if (viewName === 'congviec') loadCongViec();
+            if (viewName === 'orders') initOrdersView();
 
             // Update active nav
             document.querySelectorAll('.nav-item').forEach(item => {
@@ -2831,6 +2898,103 @@
                     </tr>`;
             }).join('');
             document.getElementById('segCount').textContent = `${rows.length} khách hàng`;
+        }
+
+        // ===== ĐƠN HÀNG =====
+        let ordPage = 1;
+        let ordEmployeesLoaded = false;
+
+        function initOrdersView() {
+            if (!ordEmployeesLoaded) {
+                // Populate dropdown nhân viên từ allCustomers
+                const emps = new Set();
+                allCustomers.forEach(c => (c.employees || []).forEach(e => { if (e) emps.add(e); }));
+                const sel = document.getElementById('ordEmployee');
+                sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
+                    Array.from(emps).sort().map(e => `<option value="${e}">${e}</option>`).join('');
+                ordEmployeesLoaded = true;
+            }
+            loadOrders(1);
+        }
+
+        function onOrdTimeChange() {
+            const v = document.getElementById('ordTime').value;
+            document.getElementById('ordCustomRange').style.display = v === 'custom' ? 'flex' : 'none';
+            if (v !== 'custom') loadOrders(1);
+        }
+
+        async function loadOrders(page) {
+            ordPage = page || 1;
+            const params = new URLSearchParams();
+            params.set('page', ordPage);
+            params.set('pageSize', 50);
+            const emp = document.getElementById('ordEmployee').value;
+            if (emp) params.set('employee', emp);
+            const timeVal = document.getElementById('ordTime').value;
+            let range = null;
+            if (timeVal === 'custom') {
+                const from = document.getElementById('ordFrom').value;
+                const to = document.getElementById('ordTo').value;
+                if (from) range = { from, to: to || from };
+                if (range) { params.set('from', range.from); params.set('to', range.to); }
+            } else {
+                range = customerPresetRange(timeVal);
+                if (range) { params.set('from', range.from); params.set('to', range.to); }
+            }
+            try {
+                const r = await apiGet('/api/orders?' + params.toString());
+                renderOrdersTable(r);
+            } catch (e) { showToast('error', 'Lỗi tải đơn hàng', e.message); }
+        }
+
+        function renderOrdersTable(r) {
+            const tbody = document.getElementById('ordersTableBody');
+            const rows = r.data || [];
+            document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('vi-VN') + ' đơn hàng';
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
+                document.getElementById('ordPaginationInfo').textContent = '';
+                document.getElementById('ordPaginationControls').innerHTML = '';
+                return;
+            }
+            tbody.innerHTML = rows.map(o => `
+                <tr>
+                    <td style="color:var(--text-gray);">${o.date || '-'}</td>
+                    <td class="order-code">${o.code || '-'}</td>
+                    <td class="customer-name">${o.customer || '-'}</td>
+                    <td style="color:var(--text-gray);">${o.phone || '-'}</td>
+                    <td style="color:var(--text-gray);">${o.brand || '-'}</td>
+                    <td>${o.segment ? `<span class="badge ${removeDiacritics(o.segment).toLowerCase().replace(/\s+/g,'-')}">${o.segment}</span>` : '-'}</td>
+                    <td style="color:var(--text-gray);">${o.employee || '-'}</td>
+                    <td style="color:var(--text-gray);">${o.website || '-'}</td>
+                    <td style="font-weight:600;">${(o.amount || 0).toLocaleString('vi-VN')} đ</td>
+                </tr>`).join('');
+
+            // Pagination
+            const total = r.total || 0, pageSize = r.pageSize || 50, page = r.page || 1;
+            const totalPages = Math.ceil(total / pageSize);
+            const start = (page - 1) * pageSize + 1;
+            const end = Math.min(page * pageSize, total);
+            document.getElementById('ordPaginationInfo').textContent = `Hiển thị ${start}-${end} trong ${total.toLocaleString('vi-VN')} đơn`;
+
+            const controls = document.getElementById('ordPaginationControls');
+            let html = '';
+            html += `<button class="btn btn-secondary" style="padding:8px 12px;" ${page === 1 ? 'disabled' : ''} onclick="loadOrders(${page - 1})">Trước</button>`;
+            const pages = [];
+            if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+            else {
+                pages.push(1);
+                if (page > 3) pages.push('...');
+                for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+                if (page < totalPages - 2) pages.push('...');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '...') html += `<span style="padding:8px 4px; color:var(--text-light);">...</span>`;
+                else html += `<button class="btn ${p === page ? 'btn-primary' : 'btn-secondary'}" style="padding:8px 16px;" onclick="loadOrders(${p})">${p}</button>`;
+            });
+            html += `<button class="btn btn-secondary" style="padding:8px 12px;" ${page === totalPages ? 'disabled' : ''} onclick="loadOrders(${page + 1})">Sau</button>`;
+            controls.innerHTML = html;
         }
 
         // ===== EXCEL UPLOAD FUNCTIONALITY =====
