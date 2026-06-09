@@ -302,8 +302,14 @@
         .table-container {
             background: white;
             border-radius: 12px;
-            overflow: hidden;
+            overflow-x: auto;            /* cuộn ngang khi bảng tràn phải */
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        /* Bảng rộng (nhiều cột) → không xuống dòng, để kích hoạt cuộn ngang */
+        .table-container table th,
+        .table-container table td {
+            white-space: nowrap;
         }
 
         table {
