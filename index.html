@@ -1159,7 +1159,10 @@
                         <tbody id="segTableBody"></tbody>
                     </table>
                 </div>
-                <div style="margin-top: 12px; color: var(--text-gray); font-size: 14px;" id="segCount"></div>
+                <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: var(--text-gray); font-size: 14px;" id="segCount"></div>
+                    <div style="display: flex; gap: 8px;" id="segPaginationControls"></div>
+                </div>
             </div>
         </div>
 
@@ -2396,7 +2399,7 @@
 
         let filteredCustomers = [...allCustomers];
         let currentPage = 1;
-        const itemsPerPage = 10;
+        const itemsPerPage = 20;
 
         // Populate website filter với unique websites
         function populateWebsiteFilter() {
@@ -2805,11 +2808,13 @@
         }
 
         // Update customer count
+        function setCustHeaderCount(n) {
+            const el = document.querySelector('#customers-view .header p');
+            if (el) el.textContent = `${(n || 0).toLocaleString('vi-VN')} khách hàng`;
+        }
+
         function updateCustomerCount() {
-            const countElement = document.querySelector('#customers-view .header p');
-            if (countElement) {
-                countElement.textContent = `${filteredCustomers.length} khách hàng`;
-            }
+            setCustHeaderCount(filteredCustomers.length);
         }
 
         // ===== SUB-TABS KHÁCH HÀNG (Tất cả / Lẻ / CTV / Sỉ) =====
@@ -2822,6 +2827,8 @@
         };
         let segSort = { col: 'revenue', dir: 'desc' };   // cột sort hiện tại
         let segSelectedWebsites = [];                     // website đang chọn (multi)
+        let segCurrentPage = 1;
+        const segPerPage = 20;
 
         function switchCustTab(tab) {
             custTab = tab;
@@ -2831,14 +2838,23 @@
             });
             document.getElementById('cust-all').classList.toggle('section-hidden', tab !== 'all');
             document.getElementById('cust-segment').classList.toggle('section-hidden', tab === 'all');
-            if (tab !== 'all') {
+            if (tab === 'all') {
+                // Cập nhật lại header count theo list "Tất cả"
+                updateCustomerCount();
+            } else {
                 segSelectedWebsites = [];
                 segSort = { col: 'revenue', dir: 'desc' };
+                segCurrentPage = 1;
                 buildSegWebsiteDropdown();
                 document.getElementById('segWebsiteCount').textContent = 'tất cả';
                 document.getElementById('segSearch').value = '';
                 renderSegmentTable();
             }
+        }
+
+        function goToSegPage(page) {
+            segCurrentPage = page;
+            renderSegmentTable(true);
         }
 
         // Website multi-select dropdown
@@ -2884,8 +2900,9 @@
             renderSegmentTable();
         }
 
-        function renderSegmentTable() {
+        function renderSegmentTable(keepPage) {
             if (custTab === 'all') return;
+            if (!keepPage) segCurrentPage = 1;   // filter/search/sort đổi → về trang 1
             const segs = SEGMENT_MAP[custTab] || [];
             const isSi = custTab === 'si';
             const timeRange = customerPresetRange(document.getElementById('segTimeFilter').value);
@@ -2950,14 +2967,25 @@
                 <th>Đơn gần nhất${sortIcon('last')}</th>
                 <th>Ghi chú</th>`;
 
+            // Cập nhật header count theo list đang hiển thị
+            setCustHeaderCount(rows.length);
+
             const tbody = document.getElementById('segTableBody');
             const colspan = isSi ? 8 : 7;
             if (rows.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding:40px; color:var(--text-light);">Không có khách hàng phù hợp</td></tr>`;
                 document.getElementById('segCount').textContent = '';
+                document.getElementById('segPaginationControls').innerHTML = '';
                 return;
             }
-            tbody.innerHTML = rows.map(r => {
+
+            // Phân trang 20/trang
+            const totalPages = Math.ceil(rows.length / segPerPage);
+            if (segCurrentPage > totalPages) segCurrentPage = totalPages;
+            const startIdx = (segCurrentPage - 1) * segPerPage;
+            const pageRows = rows.slice(startIdx, startIdx + segPerPage);
+
+            tbody.innerHTML = pageRows.map(r => {
                 const webChips = r.websites.length
                     ? `<span class="websites-tag"><svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg> ${r.websites.length} web</span>
                        <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.join(', ')}">${r.websites.join(', ')}</div>`
@@ -2975,7 +3003,28 @@
                         <td style="color:var(--text-light);">-</td>
                     </tr>`;
             }).join('');
-            document.getElementById('segCount').textContent = `${rows.length} khách hàng`;
+
+            const endIdx = Math.min(startIdx + segPerPage, rows.length);
+            document.getElementById('segCount').textContent = `Hiển thị ${startIdx + 1}-${endIdx} trong ${rows.length} khách hàng`;
+
+            // Pagination controls
+            let html = '';
+            html += `<button class="btn btn-secondary" style="padding:8px 12px;" ${segCurrentPage === 1 ? 'disabled' : ''} onclick="goToSegPage(${segCurrentPage - 1})">Trước</button>`;
+            const pages = [];
+            if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+            else {
+                pages.push(1);
+                if (segCurrentPage > 3) pages.push('...');
+                for (let i = Math.max(2, segCurrentPage - 1); i <= Math.min(totalPages - 1, segCurrentPage + 1); i++) pages.push(i);
+                if (segCurrentPage < totalPages - 2) pages.push('...');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '...') html += `<span style="padding:8px 4px; color:var(--text-light);">...</span>`;
+                else html += `<button class="btn ${p === segCurrentPage ? 'btn-primary' : 'btn-secondary'}" style="padding:8px 16px;" onclick="goToSegPage(${p})">${p}</button>`;
+            });
+            html += `<button class="btn btn-secondary" style="padding:8px 12px;" ${segCurrentPage === totalPages ? 'disabled' : ''} onclick="goToSegPage(${segCurrentPage + 1})">Sau</button>`;
+            document.getElementById('segPaginationControls').innerHTML = html;
         }
 
         // ===== ĐƠN HÀNG =====
