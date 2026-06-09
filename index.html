@@ -823,6 +823,12 @@
         .cv-history .cv-tip { display:none; position:absolute; left:0; bottom:120%; z-index:50; background:var(--secondary); color:white; padding:10px 12px; border-radius:8px; font-size:12px; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,0.25); }
         .cv-history:hover .cv-tip { display:block; }
         .row-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:rgba(0,188,212,0.1); color:var(--primary); margin:1px; }
+        /* Website filter chips-input */
+        .chips-input { display:flex; flex-wrap:wrap; gap:4px; align-items:center; border:1px solid var(--border); border-radius:6px; padding:4px 6px; margin-bottom:6px; cursor:text; }
+        .chips-input input { border:none; outline:none; flex:1; min-width:90px; font-size:13px; padding:3px; }
+        .web-chip { display:inline-flex; align-items:center; gap:5px; background:rgba(0,188,212,0.12); color:var(--primary); border-radius:10px; padding:2px 6px 2px 9px; font-size:12px; white-space:nowrap; }
+        .web-chip b { cursor:pointer; font-weight:700; line-height:1; }
+        .web-chip b:hover { color:var(--error); }
     </style>
 </head>
 <body>
@@ -2920,9 +2926,24 @@
                        <input type="checkbox" value="${w}" onchange="onSegWebsiteToggle(this)" ${segSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
                    </label>`).join('');
             box.innerHTML = `
-                <input type="text" id="segWebSearch" placeholder="Tìm website..." oninput="filterSegWebOptions()"
-                       style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; position:sticky; top:0;">
+                <div class="chips-input" onclick="document.getElementById('segWebSearch').focus()" style="position:sticky; top:0; background:white;">
+                    <span id="segWebChips"></span>
+                    <input type="text" id="segWebSearch" placeholder="Tìm website..." oninput="filterSegWebOptions()" onkeydown="segWebSearchKeydown(event)">
+                </div>
                 <div id="segWebOptions">${options}</div>`;
+            renderSegWebChips();
+        }
+
+        function renderSegWebChips() {
+            const box = document.getElementById('segWebChips');
+            if (!box) return;
+            box.innerHTML = segSelectedWebsites.map(w =>
+                `<span class="web-chip">${w}<b onclick="removeSegWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
+            ).join('');
+        }
+
+        function updateSegWebCount() {
+            document.getElementById('segWebsiteCount').textContent = segSelectedWebsites.length ? segSelectedWebsites.length + ' web' : 'tất cả';
         }
 
         function filterSegWebOptions() {
@@ -2930,6 +2951,24 @@
             document.querySelectorAll('#segWebOptions .seg-web-opt').forEach(el => {
                 el.style.display = (!q || el.dataset.web.includes(q)) ? 'flex' : 'none';
             });
+        }
+
+        // Backspace khi ô search rỗng → xóa chip cuối
+        function segWebSearchKeydown(e) {
+            if (e.key === 'Backspace' && !e.target.value && segSelectedWebsites.length) {
+                removeSegWeb(e, segSelectedWebsites[segSelectedWebsites.length - 1]);
+            }
+        }
+
+        function removeSegWeb(e, w) {
+            if (e) e.stopPropagation();
+            segSelectedWebsites = segSelectedWebsites.filter(x => x !== w);
+            // bỏ tick checkbox tương ứng (nếu đang hiển thị)
+            const cb = document.querySelector(`#segWebOptions input[type=checkbox][value="${w.replace(/"/g, '\\"')}"]`);
+            if (cb) cb.checked = false;
+            renderSegWebChips();
+            updateSegWebCount();
+            renderSegmentTable();
         }
 
         function toggleSegWebsiteDropdown(e) {
@@ -2950,7 +2989,8 @@
         function onSegWebsiteToggle(cb) {
             if (cb.checked) { if (!segSelectedWebsites.includes(cb.value)) segSelectedWebsites.push(cb.value); }
             else segSelectedWebsites = segSelectedWebsites.filter(w => w !== cb.value);
-            document.getElementById('segWebsiteCount').textContent = segSelectedWebsites.length ? segSelectedWebsites.length + ' web' : 'tất cả';
+            renderSegWebChips();
+            updateSegWebCount();
             renderSegmentTable();
         }
 
