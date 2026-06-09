@@ -983,26 +983,6 @@
                     <h2>Danh sách khách hàng</h2>
                     <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">902 khách hàng</p>
                 </div>
-                <div class="header-actions section-hidden" id="adminActions">
-                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
-                    <button class="btn btn-secondary" onclick="resetData()" title="Xóa toàn bộ dữ liệu đã upload">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                            <path d="M10 11v6"></path>
-                            <path d="M14 11v6"></path>
-                        </svg>
-                        Xóa dữ liệu
-                    </button>
-                    <button class="btn btn-primary" onclick="document.getElementById('excelFileInput').click()">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        Cập nhật từ Excel
-                    </button>
-                </div>
             </div>
 
             <!-- Sub-tabs -->
@@ -1130,6 +1110,26 @@
                     <h2>Danh sách đơn hàng</h2>
                     <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;" id="ordersCount">0 đơn hàng</p>
                 </div>
+                <div class="header-actions section-hidden" id="adminActions">
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
+                    <button class="btn btn-secondary" onclick="resetData()" title="Xóa toàn bộ dữ liệu đã upload">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                        </svg>
+                        Xóa dữ liệu
+                    </button>
+                    <button class="btn btn-primary" onclick="document.getElementById('excelFileInput').click()">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Cập nhật từ Excel
+                    </button>
+                </div>
             </div>
 
             <div class="filters">
@@ -1166,6 +1166,11 @@
                             <th>Phân nhóm</th>
                             <th>Nhân viên</th>
                             <th>Website</th>
+                            <th>Tỷ giá</th>
+                            <th>Ship QT</th>
+                            <th>Phụ thu</th>
+                            <th>Giảm giá</th>
+                            <th>Lý do giảm</th>
                             <th>Thành tiền</th>
                         </tr>
                     </thead>
@@ -2952,14 +2957,15 @@
             const rows = r.data || [];
             document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('vi-VN') + ' đơn hàng';
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
                 document.getElementById('ordPaginationInfo').textContent = '';
                 document.getElementById('ordPaginationControls').innerHTML = '';
                 return;
             }
+            const num = (v) => v ? Number(v).toLocaleString('vi-VN') : '-';
             tbody.innerHTML = rows.map(o => `
                 <tr>
-                    <td style="color:var(--text-gray);">${o.date || '-'}</td>
+                    <td style="color:var(--text-gray); white-space:nowrap;">${o.date || '-'}</td>
                     <td class="order-code">${o.code || '-'}</td>
                     <td class="customer-name">${o.customer || '-'}</td>
                     <td style="color:var(--text-gray);">${o.phone || '-'}</td>
@@ -2967,7 +2973,12 @@
                     <td>${o.segment ? `<span class="badge ${removeDiacritics(o.segment).toLowerCase().replace(/\s+/g,'-')}">${o.segment}</span>` : '-'}</td>
                     <td style="color:var(--text-gray);">${o.employee || '-'}</td>
                     <td style="color:var(--text-gray);">${o.website || '-'}</td>
-                    <td style="font-weight:600;">${(o.amount || 0).toLocaleString('vi-VN')} đ</td>
+                    <td style="color:var(--text-gray);">${num(o.ty_gia)}</td>
+                    <td style="color:var(--text-gray);">${num(o.ship_quoc_te)}</td>
+                    <td style="color:var(--text-gray);">${num(o.phu_thu)}</td>
+                    <td style="color:var(--text-gray);">${num(o.giam_gia)}</td>
+                    <td style="color:var(--text-gray); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(o.ly_do_giam_gia||'').replace(/"/g,'&quot;')}">${o.ly_do_giam_gia || '-'}</td>
+                    <td style="font-weight:600; white-space:nowrap;">${(o.amount || 0).toLocaleString('vi-VN')} đ</td>
                 </tr>`).join('');
 
             // Pagination
@@ -3102,6 +3113,11 @@
                 // Re-fetch data từ server
                 await loadCustomersFromAPI();
                 await refreshAll();
+                // Reload bảng đơn hàng (đang ở mục Đơn hàng)
+                ordEmployeesLoaded = false;
+                if (!document.getElementById('orders-view').classList.contains('section-hidden')) {
+                    initOrdersView();
+                }
 
                 document.getElementById('uploadOverlay').classList.remove('active');
                 showToast('success', 'Cập nhật thành công!',

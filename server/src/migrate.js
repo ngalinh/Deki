@@ -97,6 +97,29 @@ async function runMigrations() {
             console.log(`[migrate] Super admin ready: ${superAdmin}`);
         }
 
+        // Migration: thêm các cột chi tiết đơn vào deki_orders nếu chưa có
+        try {
+            const newCols = [
+                ['ty_gia', "DECIMAL(18,2) DEFAULT 0"],
+                ['ship_quoc_te', "DECIMAL(18,2) DEFAULT 0"],
+                ['phu_thu', "DECIMAL(18,2) DEFAULT 0"],
+                ['giam_gia', "DECIMAL(18,2) DEFAULT 0"],
+                ['ly_do_giam_gia', "VARCHAR(255)"]
+            ];
+            const existing = (await db.query(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'deki_orders'`
+            )).map(r => r.COLUMN_NAME);
+            for (const [col, def] of newCols) {
+                if (!existing.includes(col)) {
+                    await pool.query(`ALTER TABLE deki_orders ADD COLUMN ${col} ${def} AFTER employee`);
+                    console.log(`[migrate] Đã thêm cột ${col} vào deki_orders`);
+                }
+            }
+        } catch (e) {
+            console.error('[migrate] order cols migration error:', e.message);
+        }
+
         // Seed preset tags cho Follow khách
         try {
             for (const tag of ['Tiềm năng', 'Khách VIP']) {

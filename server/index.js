@@ -246,6 +246,11 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
             segment: headers.findIndex(h => h.includes('phân nhóm')),
             employee: headers.findIndex(h => h.includes('nhân viên')),
             website: headers.findIndex(h => h === 'website'),
+            tyGia: headers.findIndex(h => h.includes('tỷ giá') || h.includes('tỉ giá')),
+            shipQt: headers.findIndex(h => h.includes('ship quốc tế')),
+            phuThu: headers.findIndex(h => h.includes('phụ thu')),
+            giamGia: headers.findIndex(h => h === 'giảm giá' || (h.includes('giảm giá') && !h.includes('lý do'))),
+            lyDoGiamGia: headers.findIndex(h => h.includes('lý do')),
             total: headers.findIndex(h => h.includes('thành tiền'))
         };
         if (colIdx.customer === -1 || colIdx.total === -1) {
@@ -295,6 +300,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 }
             }
 
+            const numAt = (i) => (i !== -1 && row[i] != null && row[i] !== '') ? (Number(row[i]) || 0) : 0;
             orders.push({
                 customerKey: key,
                 code: colIdx.code !== -1 && row[colIdx.code] ? String(row[colIdx.code]).trim() : null,
@@ -302,6 +308,11 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 website: colIdx.website !== -1 && row[colIdx.website] ? String(row[colIdx.website]).trim() : null,
                 brand: colIdx.brand !== -1 && row[colIdx.brand] ? String(row[colIdx.brand]).trim() : null,
                 employee: colIdx.employee !== -1 && row[colIdx.employee] ? String(row[colIdx.employee]).trim() : null,
+                tyGia: numAt(colIdx.tyGia),
+                shipQt: numAt(colIdx.shipQt),
+                phuThu: numAt(colIdx.phuThu),
+                giamGia: numAt(colIdx.giamGia),
+                lyDoGiamGia: colIdx.lyDoGiamGia !== -1 && row[colIdx.lyDoGiamGia] ? String(row[colIdx.lyDoGiamGia]).trim() : null,
                 amount: Number(row[colIdx.total]) || 0
             });
         }
@@ -335,12 +346,14 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 for (const o of batch) {
                     const cid = idMap.get(o.customerKey);
                     if (!cid) continue;
-                    placeholders.push('(?, ?, ?, ?, ?, ?, ?)');
-                    values.push(cid, o.code, o.date, o.website, o.brand, o.employee, o.amount);
+                    placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                    values.push(cid, o.code, o.date, o.website, o.brand, o.employee,
+                        o.tyGia, o.shipQt, o.phuThu, o.giamGia, o.lyDoGiamGia, o.amount);
                 }
                 if (placeholders.length > 0) {
                     const sql = `INSERT IGNORE INTO deki_orders
-                        (customer_id, order_code, order_date, website, brand, employee, amount)
+                        (customer_id, order_code, order_date, website, brand, employee,
+                         ty_gia, ship_quoc_te, phu_thu, giam_gia, ly_do_giam_gia, amount)
                         VALUES ${placeholders.join(', ')}`;
                     const [r] = await conn.execute(sql, values);
                     inserted += r.affectedRows;
@@ -550,7 +563,8 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         const rows = await db.query(
             `SELECT DATE_FORMAT(o.order_date,'%d-%m-%Y') AS date, o.order_code AS code,
                     c.name AS customer, c.phone AS phone, c.segment AS segment,
-                    o.brand, o.employee, o.website, o.amount
+                    o.brand, o.employee, o.website,
+                    o.ty_gia, o.ship_quoc_te, o.phu_thu, o.giam_gia, o.ly_do_giam_gia, o.amount
              FROM deki_orders o JOIN deki_customers c ON c.id = o.customer_id
              ${whereSql} ORDER BY o.order_date DESC, o.id DESC
              LIMIT ${pageSize} OFFSET ${offset}`,
@@ -558,7 +572,14 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         );
         res.json({
             success: true,
-            data: rows.map(r => ({ ...r, amount: Number(r.amount) || 0 })),
+            data: rows.map(r => ({
+                ...r,
+                ty_gia: Number(r.ty_gia) || 0,
+                ship_quoc_te: Number(r.ship_quoc_te) || 0,
+                phu_thu: Number(r.phu_thu) || 0,
+                giam_gia: Number(r.giam_gia) || 0,
+                amount: Number(r.amount) || 0
+            })),
             total, page, pageSize
         });
     } catch (e) {
