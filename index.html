@@ -1076,10 +1076,6 @@
                             <option value="Sỉ nhỏ">Sỉ nhỏ</option>
                         </select>
 
-                        <select class="filter-select" id="websiteFilter">
-                            <option value="">Tất cả website</option>
-                        </select>
-
                         <select class="filter-select" id="employeeFilter">
                             <option value="">Tất cả nhân viên</option>
                         </select>
@@ -2402,11 +2398,12 @@
 
         // Populate website filter với unique websites
         function populateWebsiteFilter() {
+            const select = document.getElementById('websiteFilter');
+            if (!select) return;
             const allWebsites = new Set();
             allCustomers.forEach(c => c.websites.forEach(w => allWebsites.add(w)));
             const sortedWebsites = Array.from(allWebsites).filter(w => w !== 'N/A').sort();
 
-            const select = document.getElementById('websiteFilter');
             sortedWebsites.forEach(website => {
                 const option = document.createElement('option');
                 option.value = website;
@@ -2778,7 +2775,7 @@
             const rawSearch = document.getElementById('searchInput').value.trim();
             const searchTerm = removeDiacritics(rawSearch).toLowerCase();
             const segmentFilter = document.getElementById('segmentFilter').value;
-            const websiteFilter = document.getElementById('websiteFilter').value;
+            const websiteFilter = document.getElementById('websiteFilter')?.value || '';
             const employeeFilter = document.getElementById('employeeFilter').value;
             const timeRange = customerPresetRange(document.getElementById('allTimeFilter')?.value);
 
@@ -4218,6 +4215,7 @@
         // Re-populate website filter sau khi merge
         function repopulateWebsiteFilter() {
             const select = document.getElementById('websiteFilter');
+            if (!select) return;
             const currentValue = select.value;
 
             // Clear options (giữ option đầu "Tất cả website")
