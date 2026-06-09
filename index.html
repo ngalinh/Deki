@@ -1203,9 +1203,8 @@
                     <select class="filter-select" id="ordTime" onchange="onOrdTimeChange()">
                         <option value="all">Tất cả thời gian</option>
                         <option value="month">Trong tháng</option>
-                        <option value="3m">3 tháng</option>
                         <option value="6m">6 tháng</option>
-                        <option value="12m">1 năm</option>
+                        <option value="year">1 năm</option>
                         <option value="custom">Tùy chọn</option>
                     </select>
                     <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
@@ -2771,6 +2770,7 @@
             const [y, m, d] = last.split('-').map(Number);
             const toYMD = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
             if (preset === 'month') return { from: toYMD(new Date(y, m - 1, 1)), to: toYMD(new Date(y, m, 0)) };
+            if (preset === 'year') return { from: `${y}-01-01`, to: `${y}-12-31` };  // năm dương lịch
             const back = { '3m': 3, '6m': 6, '12m': 12 }[preset];
             if (back) { const f = new Date(y, m - 1, d); f.setMonth(f.getMonth() - back); return { from: toYMD(f), to: last }; }
             return null;
