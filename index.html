@@ -1202,9 +1202,9 @@
                     </select>
                     <select class="filter-select" id="ordTime" onchange="onOrdTimeChange()">
                         <option value="all">Tất cả thời gian</option>
-                        <option value="month">Trong tháng</option>
-                        <option value="6m">6 tháng</option>
-                        <option value="year">1 năm</option>
+                        <option value="week">Tuần</option>
+                        <option value="month">Tháng</option>
+                        <option value="year">Năm</option>
                         <option value="custom">Tùy chọn</option>
                     </select>
                     <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
@@ -2769,6 +2769,14 @@
             if (!last) return null;
             const [y, m, d] = last.split('-').map(Number);
             const toYMD = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            if (preset === 'week') {              // T2 → CN của tuần chứa ngày gần nhất
+                const cur = new Date(y, m - 1, d);
+                const dow = cur.getDay();         // 0=CN, 1=T2 ... 6=T7
+                const offsetToMon = dow === 0 ? 6 : dow - 1;
+                const mon = new Date(y, m - 1, d - offsetToMon);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                return { from: toYMD(mon), to: toYMD(sun) };
+            }
             if (preset === 'month') return { from: toYMD(new Date(y, m - 1, 1)), to: toYMD(new Date(y, m, 0)) };
             if (preset === 'year') return { from: `${y}-01-01`, to: `${y}-12-31` };  // năm dương lịch
             const back = { '3m': 3, '6m': 6, '12m': 12 }[preset];
