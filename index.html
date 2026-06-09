@@ -2866,17 +2866,32 @@
             });
             const list = Array.from(websites).sort();
             const box = document.getElementById('segWebsiteDropdown');
-            box.innerHTML = list.length === 0
-                ? '<div style="color:var(--text-light); font-size:13px; padding:8px;">Không có website</div>'
-                : list.map(w => `<label style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer;">
+            if (list.length === 0) {
+                box.innerHTML = '<div style="color:var(--text-light); font-size:13px; padding:8px;">Không có website</div>';
+                return;
+            }
+            const options = list.map(w => `<label class="seg-web-opt" data-web="${w.toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer;">
                        <input type="checkbox" value="${w}" onchange="onSegWebsiteToggle(this)" ${segSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
                    </label>`).join('');
+            box.innerHTML = `
+                <input type="text" id="segWebSearch" placeholder="Tìm website..." oninput="filterSegWebOptions()"
+                       style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; position:sticky; top:0;">
+                <div id="segWebOptions">${options}</div>`;
+        }
+
+        function filterSegWebOptions() {
+            const q = (document.getElementById('segWebSearch').value || '').trim().toLowerCase();
+            document.querySelectorAll('#segWebOptions .seg-web-opt').forEach(el => {
+                el.style.display = (!q || el.dataset.web.includes(q)) ? 'flex' : 'none';
+            });
         }
 
         function toggleSegWebsiteDropdown(e) {
             e.stopPropagation();
             const box = document.getElementById('segWebsiteDropdown');
-            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+            const opening = box.style.display === 'none';
+            box.style.display = opening ? 'block' : 'none';
+            if (opening) { const s = document.getElementById('segWebSearch'); if (s) { s.value = ''; filterSegWebOptions(); s.focus(); } }
         }
         document.addEventListener('click', (e) => {
             const dd = document.getElementById('segWebsiteDropdown');
