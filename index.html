@@ -819,9 +819,12 @@
         .cv-lbl { display:block; font-size:13px; font-weight:500; color:var(--text-gray); margin-bottom:6px; }
         .tag-chip { padding:4px 10px; border-radius:14px; font-size:12px; border:1px solid var(--border); cursor:pointer; user-select:none; background:white; color:var(--text-gray); }
         .tag-chip.selected { background:rgba(0,188,212,0.12); border-color:var(--primary); color:var(--primary); font-weight:500; }
-        .cv-history { position:relative; cursor:help; border-bottom:1px dashed var(--text-light); }
-        .cv-history .cv-tip { display:none; position:absolute; left:0; bottom:120%; z-index:50; background:var(--secondary); color:white; padding:10px 12px; border-radius:8px; font-size:12px; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,0.25); }
-        .cv-history:hover .cv-tip { display:block; }
+        .cv-history { cursor:help; border-bottom:1px dashed var(--text-light); }
+        /* Tooltip lịch sử nổi (fixed) — không bị table-container cắt */
+        #histTip { display:none; position:fixed; z-index:3000; background:var(--secondary); color:#fff; padding:10px 12px; border-radius:8px; font-size:12px; box-shadow:0 8px 24px rgba(0,0,0,0.3); max-width:280px; }
+        #histTip .ht-title { font-weight:600; margin-bottom:6px; color:var(--primary); }
+        #histTip .ht-row { display:flex; justify-content:space-between; gap:12px; padding:3px 0; border-top:1px solid rgba(255,255,255,0.12); }
+        #histTip .ht-row:first-of-type { border-top:0; }
         .row-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:rgba(0,188,212,0.1); color:var(--primary); margin:1px; }
         /* Website filter chips-input */
         .chips-input { display:flex; flex-wrap:wrap; gap:4px; align-items:center; border:1px solid var(--border); border-radius:6px; padding:4px 6px; margin-bottom:6px; cursor:text; }
@@ -3829,14 +3832,15 @@
                 return;
             }
             tbody.innerHTML = rows.map(c => {
-                const histTip = (c.history || []).length
-                    ? c.history.map(h => `${fmtDateVN(h.ngay_lien_he) || '?'}: ${h.tinh_trang || '-'}`).join('<br>')
-                    : 'Chưa có lịch sử';
                 const tagsHtml = (c.tags || []).map(t => `<span class="row-tag">${t}</span>`).join('') || '-';
                 const fbHtml = c.fb_link ? `<a href="${c.fb_link}" target="_blank" style="color:var(--primary);">Link</a>` : '-';
                 const statusBadge = c.bought
                     ? '<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--success);">Đã mua hàng</span>'
                     : (c.tinh_trang ? `<span class="badge khach-le">${c.tinh_trang}</span>` : '-');
+                // Ngày liên hệ gần nhất = max(history dates, ngay_lien_he)
+                let lastContact = c.ngay_lien_he || '';
+                (c.history || []).forEach(h => { if (h.ngay_lien_he && h.ngay_lien_he > lastContact) lastContact = h.ngay_lien_he; });
+                const hasHist = (c.history || []).length > 0;
                 return `
                     <tr>
                         <td><div class="customer-name">${c.name}</div>${c.nhom_khach ? `<div style="font-size:12px; color:var(--text-light);">${c.nhom_khach}</div>` : ''}</td>
@@ -3847,7 +3851,7 @@
                         <td style="color:var(--text-gray);">${c.nhu_cau_website || '-'}</td>
                         <td style="color:var(--text-gray);">${c.nhu_cau_sp || '-'}</td>
                         <td>${statusBadge}</td>
-                        <td><span class="cv-history">${fmtDateVN(c.ngay_lien_he) || '-'}<span class="cv-tip">${histTip}</span></span></td>
+                        <td>${lastContact ? `<span class="cv-history" onmouseenter="showHist(event, ${c.id})" onmousemove="moveHist(event)" onmouseleave="hideHist()">${fmtDateVN(lastContact)}${hasHist ? ` <span style="color:var(--text-light); font-size:11px;">(${c.history.length})</span>` : ''}</span>` : '-'}</td>
                         <td>${tagsHtml}</td>
                         <td style="color:var(--text-gray); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(c.ghi_chu||'').replace(/"/g,'&quot;')}">${c.ghi_chu || '-'}</td>
                         <td style="white-space:nowrap;">
@@ -3856,6 +3860,35 @@
                         </td>
                     </tr>`;
             }).join('');
+        }
+
+        // ===== Tooltip lịch sử liên hệ (fixed, không bị cắt) =====
+        function showHist(e, id) {
+            const c = followData.find(x => x.id === id);
+            const tip = document.getElementById('histTip');
+            if (!c || !tip) return;
+            const hist = c.history || [];
+            tip.innerHTML = `<div class="ht-title">Lịch sử liên hệ (${hist.length})</div>` +
+                (hist.length
+                    ? hist.map(h => `<div class="ht-row"><span>${fmtDateVN(h.ngay_lien_he) || '—'}</span><span>${h.tinh_trang || '-'}</span></div>`).join('')
+                    : '<div style="color:rgba(255,255,255,0.7);">Chưa có lịch sử</div>');
+            tip.style.display = 'block';
+            moveHist(e);
+        }
+        function moveHist(e) {
+            const tip = document.getElementById('histTip');
+            if (!tip || tip.style.display !== 'block') return;
+            const pad = 14;
+            let x = e.clientX + pad, y = e.clientY + pad;
+            const r = tip.getBoundingClientRect();
+            if (x + r.width > window.innerWidth) x = e.clientX - r.width - pad;
+            if (y + r.height > window.innerHeight) y = e.clientY - r.height - pad;
+            tip.style.left = Math.max(4, x) + 'px';
+            tip.style.top = Math.max(4, y) + 'px';
+        }
+        function hideHist() {
+            const tip = document.getElementById('histTip');
+            if (tip) tip.style.display = 'none';
         }
 
         // Populate dropdown Nhu cầu Website từ danh sách website trong đơn hàng
@@ -4705,6 +4738,9 @@
             </svg>
         </button>
     </div>
+
+    <!-- History tooltip nổi (Follow khách) -->
+    <div id="histTip"></div>
 
     <!-- Auth Blocker -->
     <div class="auth-blocker" id="authBlocker">
