@@ -338,6 +338,9 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+        /* Input/textarea dùng class filter-select → con trỏ nhập liệu, không phải bàn tay */
+        input.filter-select, textarea.filter-select { cursor: text; }
+        input[type="date"].filter-select { cursor: default; }
 
         .filter-select:focus {
             outline: none;
