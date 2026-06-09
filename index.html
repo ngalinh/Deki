@@ -2006,19 +2006,21 @@
             }
         }
 
-        // Close modal when clicking outside
+        // Close modal khi click NỀN (overlay). Chỉ đóng nếu chuột BẮT ĐẦU bấm trên chính overlay đó
+        // → tránh trường hợp bôi đen text kéo từ trong modal ra ngoài rồi nhả (vô tình tắt modal).
+        let modalMouseDownTarget = null;
+        document.addEventListener('mousedown', function(e) { modalMouseDownTarget = e.target; });
+        const MODAL_CLOSERS = {
+            customerModal: () => closeCustomerModal(),
+            allOrdersModal: () => closeAllOrdersModal(),
+            allWebsitesModal: () => closeAllWebsitesModal(),
+            followModal: () => closeFollowModal(),
+            handoverModal: () => closeHandoverModal()
+        };
         document.addEventListener('click', function(e) {
-            if (e.target.id === 'customerModal') {
-                closeCustomerModal();
-            }
-            if (e.target.id === 'allOrdersModal') {
-                closeAllOrdersModal();
-            }
-            if (e.target.id === 'allWebsitesModal') {
-                closeAllWebsitesModal();
-            }
-            if (e.target.id === 'followModal') closeFollowModal();
-            if (e.target.id === 'handoverModal') closeHandoverModal();
+            const closer = MODAL_CLOSERS[e.target.id];
+            // chỉ đóng khi mousedown VÀ click cùng trên overlay
+            if (closer && modalMouseDownTarget === e.target) closer();
         });
 
         // Data từ phân tích DS_DONHANG.xlsx
