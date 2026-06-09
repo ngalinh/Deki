@@ -3958,6 +3958,54 @@
             if (dd && dd.style.display === 'block' && !dd.contains(e.target) && box && !box.contains(e.target)) dd.style.display = 'none';
         });
 
+        // ===== Autocomplete "Khách hàng" theo data khách (tên/SĐT) =====
+        function onFNameInput() {
+            const dd = document.getElementById('fNameDropdown');
+            const raw = document.getElementById('fName').value.trim();
+            const q = removeDiacritics(raw).toLowerCase();
+            const digits = raw.replace(/\D/g, '');
+            if (!raw) { dd.style.display = 'none'; return; }
+
+            const matches = allCustomers.filter(c => {
+                const nameMatch = removeDiacritics(c.name).toLowerCase().includes(q);
+                const phoneMatch = digits.length >= 3 && (c.phone || '').replace(/\D/g, '').includes(digits);
+                return nameMatch || phoneMatch;
+            }).slice(0, 20);
+
+            let html = `<div onclick="fNameAddNew()" style="padding:8px 10px; font-size:13px; cursor:pointer; color:var(--primary); font-weight:500; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Thêm khách hàng "${raw}" thủ công</div>`;
+            if (matches.length) {
+                html += `<div style="display:flex; justify-content:space-between; padding:5px 10px; font-size:11px; color:var(--text-light); text-transform:uppercase;"><span>Khách hàng</span><span>Điện thoại</span></div>`;
+                html += matches.map(c =>
+                    `<div onclick="selectFCustomer('${c.name.replace(/'/g, "\\'")}', '${(c.phone || '').replace(/'/g, "\\'")}')"
+                          style="display:flex; justify-content:space-between; gap:12px; padding:7px 10px; font-size:13px; cursor:pointer;"
+                          onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background=''">
+                        <span class="customer-name" style="font-weight:500;">${c.name}</span>
+                        <span style="color:var(--text-gray); white-space:nowrap;">${c.phone || '-'}</span>
+                     </div>`).join('');
+            } else {
+                html += `<div style="padding:8px 10px; font-size:12px; color:var(--text-light);">Không tìm thấy khách trong dữ liệu — sẽ thêm thủ công</div>`;
+            }
+            dd.innerHTML = html;
+            dd.style.display = 'block';
+        }
+        function selectFCustomer(name, phone) {
+            document.getElementById('fName').value = name;
+            document.getElementById('fPhone').value = phone || '';
+            document.getElementById('fNameDropdown').style.display = 'none';
+        }
+        function fNameAddNew() {
+            // giữ nguyên text đã gõ làm tên, đóng dropdown để điền SĐT thủ công
+            document.getElementById('fNameDropdown').style.display = 'none';
+            document.getElementById('fPhone').focus();
+        }
+        document.addEventListener('click', (e) => {
+            const dd = document.getElementById('fNameDropdown');
+            const inp = document.getElementById('fName');
+            if (dd && dd.style.display === 'block' && e.target !== inp && !dd.contains(e.target)) dd.style.display = 'none';
+        });
+
         function renderTagPicker() {
             const box = document.getElementById('fTagList');
             box.innerHTML = followTags.map(t =>
@@ -3990,6 +4038,7 @@
             document.getElementById('followModalTitle').textContent = f ? 'Sửa khách hàng' : 'Thêm khách hàng';
             document.getElementById('fEditId').value = f ? f.id : '';
             document.getElementById('fName').value = f ? f.name : '';
+            document.getElementById('fNameDropdown').style.display = 'none';
             document.getElementById('fNhomKhach').value = f ? f.nhom_khach : '';
             document.getElementById('fPhone').value = f ? f.phone : '';
             document.getElementById('fFbLink').value = f ? f.fb_link : '';
@@ -4675,7 +4724,12 @@
             <div class="modal-body">
                 <input type="hidden" id="fEditId">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                    <div><label class="cv-lbl">Tên khách hàng *</label><input type="text" id="fName" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Khách hàng *</label>
+                        <div style="position:relative;">
+                            <input type="text" id="fName" class="filter-select" style="width:100%" autocomplete="off" placeholder="Gõ tên hoặc SĐT để tìm..." oninput="onFNameInput()">
+                            <div id="fNameDropdown" style="display:none; position:absolute; top:104%; left:0; right:0; z-index:80; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); max-height:240px; overflow:auto;"></div>
+                        </div>
+                    </div>
                     <div><label class="cv-lbl">Nhóm khách</label>
                         <select id="fNhomKhach" class="filter-select" style="width:100%">
                             <option value="">— Chọn —</option>
