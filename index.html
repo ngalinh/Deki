@@ -1060,12 +1060,19 @@
             <div id="cust-all">
                 <div class="filters">
                     <div class="filters-row">
-                        <select class="filter-select" id="allTimeFilter" onchange="applyFilters()">
+                        <select class="filter-select" id="allTimeFilter" onchange="onAllTimeChange()">
                             <option value="all">Tất cả thời gian</option>
                             <option value="3m">3 tháng</option>
                             <option value="6m">6 tháng</option>
                             <option value="12m">1 năm</option>
+                            <option value="custom">Tùy chọn</option>
                         </select>
+                        <span id="allCustomRange" style="display:none; gap:6px; align-items:center;">
+                            <input type="date" id="allCustFrom" class="filter-select">
+                            <span style="color:var(--text-light);">→</span>
+                            <input type="date" id="allCustTo" class="filter-select">
+                            <button class="btn btn-primary" onclick="applyFilters()">Lọc</button>
+                        </span>
 
                         <select class="filter-select" id="segmentFilter">
                             <option value="">Tất cả phân nhóm</option>
@@ -1117,20 +1124,34 @@
             <div id="cust-segment" class="section-hidden">
                 <div class="filters">
                     <div class="filters-row">
-                        <select class="filter-select" id="segTimeFilter" onchange="renderSegmentTable()" title="Lọc đơn theo thời gian">
+                        <select class="filter-select" id="segTimeFilter" onchange="onSegTimeChange()" title="Lọc đơn theo thời gian">
                             <option value="all">Tất cả thời gian</option>
                             <option value="month">Trong tháng</option>
                             <option value="3m">3 tháng</option>
                             <option value="6m">6 tháng</option>
                             <option value="12m">1 năm</option>
+                            <option value="custom">Tùy chọn</option>
                         </select>
-                        <select class="filter-select" id="segLastOrderFilter" onchange="renderSegmentTable()" title="Lọc theo đơn gần nhất">
+                        <span id="segTimeCustom" style="display:none; gap:6px; align-items:center;">
+                            <input type="date" id="segCustFrom" class="filter-select">
+                            <span style="color:var(--text-light);">→</span>
+                            <input type="date" id="segCustTo" class="filter-select">
+                            <button class="btn btn-primary" onclick="renderSegmentTable()">Lọc</button>
+                        </span>
+                        <select class="filter-select" id="segLastOrderFilter" onchange="onSegLastChange()" title="Lọc theo đơn gần nhất">
                             <option value="all">Đơn gần nhất: tất cả</option>
                             <option value="month">Đơn gần nhất: trong tháng</option>
                             <option value="3m">Đơn gần nhất: 3 tháng</option>
                             <option value="6m">Đơn gần nhất: 6 tháng</option>
                             <option value="12m">Đơn gần nhất: 1 năm</option>
+                            <option value="custom">Đơn gần nhất: tùy chọn</option>
                         </select>
+                        <span id="segLastCustom" style="display:none; gap:6px; align-items:center;">
+                            <input type="date" id="segLastFrom" class="filter-select">
+                            <span style="color:var(--text-light);">→</span>
+                            <input type="date" id="segLastTo" class="filter-select">
+                            <button class="btn btn-primary" onclick="renderSegmentTable()">Lọc</button>
+                        </span>
                         <div style="position: relative;">
                             <button class="btn btn-secondary" type="button" onclick="toggleSegWebsiteDropdown(event)" id="segWebsiteBtn">
                                 Website (<span id="segWebsiteCount">tất cả</span>)
@@ -2749,6 +2770,17 @@
         // Apply filters
         // Helper: tính {from,to} (YYYY-MM-DD) theo preset, dựa trên ngày dữ liệu gần nhất
         //   all → null | month → tháng lịch | 3m/6m/12m → lùi N tháng từ ngày gần nhất
+        // Resolve khoảng thời gian từ 1 select: preset thường → customerPresetRange; 'custom' → đọc 2 ô ngày
+        function resolveTimeRange(selectId, fromId, toId) {
+            const v = document.getElementById(selectId)?.value;
+            if (v === 'custom') {
+                const from = document.getElementById(fromId)?.value;
+                const to = document.getElementById(toId)?.value;
+                return (from || to) ? { from: from || to, to: to || from } : null;
+            }
+            return customerPresetRange(v);
+        }
+
         function customerPresetRange(preset) {
             if (!preset || preset === 'all') return null;
             let last = null;
@@ -2777,7 +2809,7 @@
             const segmentFilter = document.getElementById('segmentFilter').value;
             const websiteFilter = document.getElementById('websiteFilter')?.value || '';
             const employeeFilter = document.getElementById('employeeFilter').value;
-            const timeRange = customerPresetRange(document.getElementById('allTimeFilter')?.value);
+            const timeRange = resolveTimeRange('allTimeFilter', 'allCustFrom', 'allCustTo');
 
             filteredCustomers = allCustomers.filter(customer => {
                 const nameNoDiacritics = removeDiacritics(customer.name).toLowerCase();
@@ -2853,6 +2885,23 @@
             renderSegmentTable(true);
         }
 
+        // Toggle ô ngày tùy chọn cho các filter thời gian
+        function onAllTimeChange() {
+            const custom = document.getElementById('allTimeFilter').value === 'custom';
+            document.getElementById('allCustomRange').style.display = custom ? 'inline-flex' : 'none';
+            if (!custom) applyFilters();
+        }
+        function onSegTimeChange() {
+            const custom = document.getElementById('segTimeFilter').value === 'custom';
+            document.getElementById('segTimeCustom').style.display = custom ? 'inline-flex' : 'none';
+            if (!custom) renderSegmentTable();
+        }
+        function onSegLastChange() {
+            const custom = document.getElementById('segLastOrderFilter').value === 'custom';
+            document.getElementById('segLastCustom').style.display = custom ? 'inline-flex' : 'none';
+            if (!custom) renderSegmentTable();
+        }
+
         // Website multi-select dropdown
         function buildSegWebsiteDropdown() {
             const segs = SEGMENT_MAP[custTab] || [];
@@ -2916,8 +2965,8 @@
             if (!keepPage) segCurrentPage = 1;   // filter/search/sort đổi → về trang 1
             const segs = SEGMENT_MAP[custTab] || [];
             const isSi = custTab === 'si';
-            const timeRange = customerPresetRange(document.getElementById('segTimeFilter').value);
-            const lastRange = customerPresetRange(document.getElementById('segLastOrderFilter').value);
+            const timeRange = resolveTimeRange('segTimeFilter', 'segCustFrom', 'segCustTo');
+            const lastRange = resolveTimeRange('segLastOrderFilter', 'segLastFrom', 'segLastTo');
             const q = removeDiacritics((document.getElementById('segSearch').value || '').trim()).toLowerCase();
             const webSet = segSelectedWebsites;
 
