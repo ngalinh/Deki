@@ -2991,6 +2991,9 @@
             else segSelectedWebsites = segSelectedWebsites.filter(w => w !== cb.value);
             renderSegWebChips();
             updateSegWebCount();
+            // Xóa text đã gõ + hiện lại full list để tìm web khác
+            const s = document.getElementById('segWebSearch');
+            if (s) { s.value = ''; filterSegWebOptions(); s.focus(); }
             renderSegmentTable();
         }
 
