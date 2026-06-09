@@ -9,7 +9,7 @@ const SUPER_ADMIN_EMAIL = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().tri
 // DEV mode: chạy local KHÔNG cần cookie basso.vn. Bật bằng DEKI_DEV_MODE=1 trong .env.
 // Khi bật → mọi request coi như super admin (dev@local). TUYỆT ĐỐI không bật trên production.
 const DEV_MODE = process.env.DEKI_DEV_MODE === '1';
-const DEV_USER = { email: SUPER_ADMIN_EMAIL || 'dev@local', name: 'Dev (local)', staffName: null, roles: ['admin'], isDekiAdmin: true };
+const DEV_USER = { email: SUPER_ADMIN_EMAIL || 'dev@local', name: 'Dev (local)', staffNames: [], roles: ['admin'], isDekiAdmin: true };
 
 const sessionCache = new Map();
 
@@ -37,20 +37,26 @@ async function verifyBassoSession(cookieHeader) {
         const u = data.user;
         const email = String(u.username).toLowerCase().trim();
 
-        // Lấy thông tin từ DB permissions (tên hiển thị + tên nhân viên để filter)
-        let dbName = null, staffName = null;
+        // Lấy thông tin từ DB permissions (tên hiển thị + DANH SÁCH tên nhân viên để filter)
+        let dbName = null, staffNames = [];
         try {
             const rows = await db.query('SELECT name, staff_name FROM deki_permissions WHERE email = ?', [email]);
             if (rows.length > 0) {
                 dbName = rows[0].name || null;
-                staffName = rows[0].staff_name || null;
+                const raw = rows[0].staff_name;
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        staffNames = Array.isArray(parsed) ? parsed : [String(raw)];
+                    } catch { staffNames = [String(raw)]; }
+                }
             }
         } catch {}
 
         const user = {
             email,
             name: dbName || u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
-            staffName,
+            staffNames,
             roles: Array.isArray(u.roles) ? u.roles : [],
             raw: u
         };

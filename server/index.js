@@ -72,10 +72,10 @@ app.get('/api/me', async (req, res) => {
 app.get('/api/customers', requireAuth(), async (req, res) => {
     try {
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffName = req.user.staffName;
+        const staffNames = req.user.staffNames || [];
 
-        // Non-admin chưa được map staff_name → không thấy gì
-        if (!isAdmin && !staffName) {
+        // Non-admin chưa được map tên nhân viên nào → không thấy gì
+        if (!isAdmin && staffNames.length === 0) {
             return res.json({
                 success: true,
                 data: [],
@@ -83,9 +83,9 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
             });
         }
 
-        // Build query — filter orders theo employee nếu không phải admin
-        const orderWhere = isAdmin ? '' : 'WHERE employee = ?';
-        const orderParams = isAdmin ? [] : [staffName];
+        // Build query — filter orders theo employee (IN nhiều tên) nếu không phải admin
+        const orderWhere = isAdmin ? '' : `WHERE employee IN (${staffNames.map(() => '?').join(',')})`;
+        const orderParams = isAdmin ? [] : [...staffNames];
 
         const allOrders = await db.query(
             `SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
@@ -200,11 +200,13 @@ app.get('/api/customers/:id/orders', requireAuth(), async (req, res) => {
     try {
         const id = Number(req.params.id);
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffName = req.user.staffName;
-        if (!isAdmin && !staffName) return res.json({ success: true, data: [] });
+        const staffNames = req.user.staffNames || [];
+        if (!isAdmin && staffNames.length === 0) return res.json({ success: true, data: [] });
 
-        const where = isAdmin ? 'WHERE customer_id = ?' : 'WHERE customer_id = ? AND employee = ?';
-        const params = isAdmin ? [id] : [id, staffName];
+        const where = isAdmin
+            ? 'WHERE customer_id = ?'
+            : `WHERE customer_id = ? AND employee IN (${staffNames.map(() => '?').join(',')})`;
+        const params = isAdmin ? [id] : [id, ...staffNames];
 
         const orders = await db.query(
             `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
@@ -401,7 +403,16 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
 app.get('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
         const rows = await db.query('SELECT email, name, staff_name, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
-        res.json({ success: true, data: rows });
+        // staff_name → mảng (tương thích ngược chuỗi đơn cũ)
+        const data = rows.map(r => {
+            let staffNames = [];
+            if (r.staff_name) {
+                try { const p = JSON.parse(r.staff_name); staffNames = Array.isArray(p) ? p : [String(r.staff_name)]; }
+                catch { staffNames = [String(r.staff_name)]; }
+            }
+            return { ...r, staff_names: staffNames };
+        });
+        res.json({ success: true, data });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
@@ -424,13 +435,17 @@ app.get('/api/employees', requireAuth(), requireAdmin(), async (req, res) => {
 // POST /api/permissions - add/update user
 app.post('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
-        const { email, name, staff_name, is_admin } = req.body;
+        const { email, name, staff_name, staff_names, is_admin } = req.body;
         if (!email) return res.status(400).json({ success: false, error: 'Thiếu email' });
         const cleanEmail = String(email).toLowerCase().trim();
+        // Hỗ trợ cả staff_names (mảng - mới) lẫn staff_name (chuỗi - cũ)
+        let staffVal = null;
+        if (Array.isArray(staff_names)) staffVal = staff_names.length ? JSON.stringify(staff_names) : null;
+        else if (staff_name) staffVal = staff_name;
         await db.query(
             `INSERT INTO deki_permissions (email, name, staff_name, is_admin) VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE name = VALUES(name), staff_name = VALUES(staff_name), is_admin = VALUES(is_admin)`,
-            [cleanEmail, name || null, staff_name || null, is_admin ? 1 : 0]
+            [cleanEmail, name || null, staffVal, is_admin ? 1 : 0]
         );
         clearSessionCache(); // để user nhìn thấy tên/quyền mới ngay
         res.json({ success: true });
@@ -544,14 +559,14 @@ app.post('/api/partner/segments-by-phones', requireApiKey(), async (req, res) =>
 app.get('/api/orders', requireAuth(), async (req, res) => {
     try {
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffName = req.user.staffName;
-        if (!isAdmin && !staffName) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
+        const staffNames = req.user.staffNames || [];
+        if (!isAdmin && staffNames.length === 0) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
 
         const where = [], params = [];
         if (isAdmin) {
             if (req.query.employee) { where.push('o.employee = ?'); params.push(req.query.employee); }
         } else {
-            where.push('o.employee = ?'); params.push(staffName);
+            where.push(`o.employee IN (${staffNames.map(() => '?').join(',')})`); params.push(...staffNames);
         }
         if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
         if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }

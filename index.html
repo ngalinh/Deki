@@ -1474,10 +1474,16 @@
                         <input type="text" id="permName" class="filter-select" style="width: 100%;" placeholder="VD: Linh">
                     </div>
                     <div>
-                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Tên nhân viên (trong Excel)</label>
-                        <select id="permStaffName" class="filter-select" style="width: 100%;">
-                            <option value="">— Không filter (chỉ Admin chọn) —</option>
-                        </select>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Tên nhân viên (trong Excel) — chọn nhiều</label>
+                        <div style="position:relative;">
+                            <div id="permStaffBox" class="chips-input" onclick="openPermStaffDropdown(event)" style="min-height:36px;">
+                                <span id="permStaffChips"></span>
+                                <input type="text" id="permStaffSearch" placeholder="Tìm / chọn nhân viên..." oninput="filterPermStaffOptions()" onkeydown="permStaffKeydown(event)">
+                            </div>
+                            <div id="permStaffDropdown" style="display:none; position:absolute; top:104%; left:0; right:0; z-index:80; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:8px;">
+                                <div id="permStaffOptions" style="max-height:240px; overflow:auto;"></div>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label style="display: flex; align-items: center; gap: 6px; padding: 10px 0;">
@@ -4202,20 +4208,17 @@
             } catch (e) { showToast('error', 'Lỗi xóa', e.message); }
         }
 
+        let permStaffList = [];        // danh sách nhân viên trong dữ liệu
+        let permStaffSelected = [];    // nhân viên đang chọn cho user đang sửa
+
         async function loadPermissions() {
             try {
-                // Load song song: permissions + danh sách nhân viên trong DB
                 const [permResult, empResult] = await Promise.all([
                     apiGet('/api/permissions'),
                     apiGet('/api/employees').catch(() => ({ data: [] }))
                 ]);
-
-                // Populate dropdown nhân viên
-                const staffSelect = document.getElementById('permStaffName');
-                const currentVal = staffSelect.value;
-                staffSelect.innerHTML = '<option value="">— Không filter (chỉ Admin chọn) —</option>' +
-                    (empResult.data || []).map(name => `<option value="${name}">${name}</option>`).join('');
-                staffSelect.value = currentVal;
+                permStaffList = empResult.data || [];
+                renderPermStaffOptions();
 
                 const tbody = document.getElementById('permTableBody');
                 if (!permResult.data || permResult.data.length === 0) {
@@ -4225,12 +4228,14 @@
                 tbody.innerHTML = permResult.data.map(u => {
                     const isSelf = u.email === (currentUser?.email || '');
                     const date = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '-';
-                    const editArgs = `'${u.email}', ${JSON.stringify(u.name || '').replace(/"/g, '&quot;')}, ${JSON.stringify(u.staff_name || '').replace(/"/g, '&quot;')}, ${u.is_admin}`;
+                    const names = u.staff_names || [];
+                    const namesText = names.length ? names.map(n => `<span class="row-tag">${n}</span>`).join('') : '<span style="color: var(--text-light);">—</span>';
+                    const editArgs = `'${u.email}', ${JSON.stringify(u.name || '').replace(/"/g, '&quot;')}, ${JSON.stringify(names).replace(/"/g, '&quot;')}, ${u.is_admin}`;
                     return `
                         <tr>
                             <td class="customer-name">${u.email}${isSelf ? ' <span style="color: var(--text-light); font-size: 12px;">(bạn)</span>' : ''}</td>
                             <td>${u.name || '-'}</td>
-                            <td>${u.staff_name || '<span style="color: var(--text-light);">—</span>'}</td>
+                            <td>${namesText}</td>
                             <td>${u.is_admin ? '<span class="badge ctv">Admin</span>' : '<span class="badge khach-le">User</span>'}</td>
                             <td style="color: var(--text-gray); font-size: 13px;">${date}</td>
                             <td>
@@ -4245,10 +4250,61 @@
             }
         }
 
-        function editPermission(email, name, staffName, isAdmin) {
+        // ----- Multi-select chips cho Tên nhân viên -----
+        function renderPermStaffChips() {
+            const box = document.getElementById('permStaffChips');
+            box.innerHTML = permStaffSelected.map(n =>
+                `<span class="web-chip">${n}<b onclick="removePermStaff(event, '${n.replace(/'/g, "\\'")}')">×</b></span>`
+            ).join('');
+        }
+        function renderPermStaffOptions() {
+            const box = document.getElementById('permStaffOptions');
+            if (!box) return;
+            box.innerHTML = permStaffList.map(n =>
+                `<label class="pstaff-opt" data-n="${removeDiacritics(n).toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer; border-radius:6px;">
+                    <input type="checkbox" value="${n}" onchange="togglePermStaff(this)" ${permStaffSelected.includes(n) ? 'checked' : ''}> ${n}
+                 </label>`).join('') || '<div style="color:var(--text-light); font-size:12px; padding:6px;">Chưa có nhân viên (cần import đơn hàng)</div>';
+        }
+        function filterPermStaffOptions() {
+            const q = removeDiacritics(document.getElementById('permStaffSearch').value || '').trim().toLowerCase();
+            document.querySelectorAll('#permStaffOptions .pstaff-opt').forEach(el => {
+                el.style.display = (!q || el.dataset.n.includes(q)) ? 'flex' : 'none';
+            });
+        }
+        function togglePermStaff(cb) {
+            if (cb.checked) { if (!permStaffSelected.includes(cb.value)) permStaffSelected.push(cb.value); }
+            else permStaffSelected = permStaffSelected.filter(n => n !== cb.value);
+            renderPermStaffChips();
+            const s = document.getElementById('permStaffSearch'); if (s) { s.value = ''; filterPermStaffOptions(); s.focus(); }
+        }
+        function removePermStaff(e, n) {
+            if (e) e.stopPropagation();
+            permStaffSelected = permStaffSelected.filter(x => x !== n);
+            const cb = document.querySelector(`#permStaffOptions input[type=checkbox][value="${n.replace(/"/g, '\\"')}"]`);
+            if (cb) cb.checked = false;
+            renderPermStaffChips();
+        }
+        function permStaffKeydown(e) {
+            if (e.key === 'Backspace' && !e.target.value && permStaffSelected.length) removePermStaff(e, permStaffSelected[permStaffSelected.length - 1]);
+        }
+        function openPermStaffDropdown() {
+            document.getElementById('permStaffDropdown').style.display = 'block';
+            document.getElementById('permStaffSearch').focus();
+        }
+        document.addEventListener('click', (e) => {
+            const dd = document.getElementById('permStaffDropdown');
+            const box = document.getElementById('permStaffBox');
+            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && box && !box.contains(e.target)) dd.style.display = 'none';
+        });
+
+        function editPermission(email, name, staffNames, isAdmin) {
             document.getElementById('permEmail').value = email;
             document.getElementById('permName').value = name || '';
-            document.getElementById('permStaffName').value = staffName || '';
+            permStaffSelected = Array.isArray(staffNames) ? [...staffNames] : (staffNames ? [staffNames] : []);
+            document.getElementById('permStaffDropdown').style.display = 'none';
+            document.getElementById('permStaffSearch').value = '';
+            renderPermStaffOptions();
+            renderPermStaffChips();
             document.getElementById('permAdmin').checked = !!isAdmin;
             document.getElementById('permEmail').focus();
         }
@@ -4256,18 +4312,19 @@
         async function savePermission() {
             const email = document.getElementById('permEmail').value.trim();
             const name = document.getElementById('permName').value.trim();
-            const staff_name = document.getElementById('permStaffName').value.trim();
             const is_admin = document.getElementById('permAdmin').checked;
             if (!email) {
                 showToast('error', 'Thiếu email', 'Vui lòng nhập email');
                 return;
             }
             try {
-                await apiPost('/api/permissions', { email, name, staff_name, is_admin });
+                await apiPost('/api/permissions', { email, name, staff_names: permStaffSelected, is_admin });
                 showToast('success', 'Đã lưu', `User ${email} đã được cập nhật`);
                 document.getElementById('permEmail').value = '';
                 document.getElementById('permName').value = '';
-                document.getElementById('permStaffName').value = '';
+                permStaffSelected = [];
+                renderPermStaffChips();
+                renderPermStaffOptions();
                 document.getElementById('permAdmin').checked = false;
                 loadPermissions();
             } catch (err) {

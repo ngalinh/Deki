@@ -120,6 +120,13 @@ async function runMigrations() {
             console.error('[migrate] order cols migration error:', e.message);
         }
 
+        // Migration: staff_name đổi sang TEXT (1 email map NHIỀU tên nhân viên dạng JSON)
+        try {
+            await pool.query(`ALTER TABLE deki_permissions MODIFY COLUMN staff_name TEXT`).catch(() => {});
+        } catch (e) {
+            console.error('[migrate] staff_name->TEXT migration error:', e.message);
+        }
+
         // Migration: nhu_cau_website đổi sang TEXT (lưu nhiều website dạng JSON)
         try {
             await pool.query(`ALTER TABLE deki_follow_customers MODIFY COLUMN nhu_cau_website TEXT`).catch(() => {});
