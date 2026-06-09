@@ -1895,7 +1895,7 @@
                                 <line x1="2" y1="12" x2="22" y2="12"></line>
                                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                             </svg>
-                            <span style="font-weight: 500;">${w.name}</span>
+                            <span style="font-weight: 500;">${webName(w.name)}</span>
                         </span>
                         <div class="order-info">
                             <div style="color: var(--text-gray); font-size: 13px;">${hasStats ? w.orders + ' đơn' : ''}</div>
@@ -1976,7 +1976,7 @@
                         <line x1="2" y1="12" x2="22" y2="12"></line>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                     </svg>
-                    ${website}
+                    ${webName(website)}
                 </div>
             `).join('');
 
@@ -2079,7 +2079,7 @@
             const top = Object.entries(webCount)
                 .map(([name, orders]) => ({ name, orders, revenue: webRev[name] || 0 }))
                 .sort((a, b) => b.orders - a.orders).slice(0, 10);
-            websiteData.labels = top.map(t => t.name);
+            websiteData.labels = top.map(t => webName(t.name));
             websiteData.orders = top.map(t => t.orders);
             websiteData.revenue = top.map(t => t.revenue);
             if (websiteChart) {
@@ -2337,6 +2337,17 @@
             return str.normalize('NFD')
                 .replace(/[̀-ͯ]/g, '')
                 .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+        }
+
+        // Tên website để HIỂN THỊ (bỏ TLD .com/.co.uk/...). Giá trị lưu vẫn giữ nguyên domain đầy đủ.
+        const _MULTI_TLD = ['.co.uk', '.com.vn', '.com.au', '.co.jp', '.co.kr', '.com.cn', '.co.nz', '.com.tr'];
+        function webName(w) {
+            if (!w) return w || '';
+            let s = String(w).trim();
+            const low = s.toLowerCase();
+            for (const t of _MULTI_TLD) { if (low.endsWith(t)) return s.slice(0, -t.length); }
+            const i = s.lastIndexOf('.');
+            return i > 0 ? s.slice(0, i) : s;
         }
 
         // ===== API CLIENT =====
@@ -2931,7 +2942,7 @@
                 return;
             }
             const options = list.map(w => `<label class="seg-web-opt" data-web="${w.toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer;">
-                       <input type="checkbox" value="${w}" onchange="onSegWebsiteToggle(this)" ${segSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
+                       <input type="checkbox" value="${w}" onchange="onSegWebsiteToggle(this)" ${segSelectedWebsites.includes(w) ? 'checked' : ''}> ${webName(w)}
                    </label>`).join('');
             box.innerHTML = `
                 <div class="chips-input" onclick="document.getElementById('segWebSearch').focus()" style="position:sticky; top:0; background:white;">
@@ -2946,7 +2957,7 @@
             const box = document.getElementById('segWebChips');
             if (!box) return;
             box.innerHTML = segSelectedWebsites.map(w =>
-                `<span class="web-chip">${w}<b onclick="removeSegWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
+                `<span class="web-chip">${webName(w)}<b onclick="removeSegWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
             ).join('');
         }
 
@@ -3110,7 +3121,7 @@
             tbody.innerHTML = pageRows.map(r => {
                 const webChips = r.websites.length
                     ? `<span style="font-weight:500;">${r.websites.length} web</span>
-                       <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.join(', ')}">${r.websites.join(', ')}</div>`
+                       <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.map(webName).join(', ')}">${r.websites.map(webName).join(', ')}</div>`
                     : '-';
                 const segBadge = isSi ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
                 return `
@@ -3216,7 +3227,7 @@
                     <td style="color:var(--text-gray);">${o.brand || '-'}</td>
                     <td>${o.segment ? `<span class="badge ${removeDiacritics(o.segment).toLowerCase().replace(/\s+/g,'-')}">${o.segment}</span>` : '-'}</td>
                     <td style="color:var(--text-gray);">${o.employee || '-'}</td>
-                    <td style="color:var(--text-gray);">${o.website || '-'}</td>
+                    <td style="color:var(--text-gray);">${o.website ? webName(o.website) : '-'}</td>
                     <td style="color:var(--text-gray);">${num(o.ty_gia)}</td>
                     <td style="color:var(--text-gray);">${num(o.ship_quoc_te)}</td>
                     <td style="color:var(--text-gray);">${num(o.phu_thu)}</td>
@@ -3853,7 +3864,7 @@
                         <td>${fbHtml}</td>
                         <td style="color:var(--text-gray);">${c.nguon_khach || '-'}</td>
                         <td style="color:var(--text-gray);">${c.nganh_hang || '-'}</td>
-                        <td style="color:var(--text-gray);">${(Array.isArray(c.nhu_cau_website) && c.nhu_cau_website.length) ? c.nhu_cau_website.map(w => `<span class="row-tag">${w}</span>`).join('') : '-'}</td>
+                        <td style="color:var(--text-gray);">${(Array.isArray(c.nhu_cau_website) && c.nhu_cau_website.length) ? c.nhu_cau_website.map(w => `<span class="row-tag">${webName(w)}</span>`).join('') : '-'}</td>
                         <td style="color:var(--text-gray);">${c.nhu_cau_sp || '-'}</td>
                         <td>${statusBadge}</td>
                         <td>${lastContact ? `<span class="cv-history" onmouseenter="showHist(event, ${c.id})" onmousemove="moveHist(event)" onmouseleave="hideHist()">${fmtDateVN(lastContact)}${hasHist ? ` <span style="color:var(--text-light); font-size:11px;">(${c.history.length})</span>` : ''}</span>` : '-'}</td>
@@ -3910,7 +3921,7 @@
             const box = document.getElementById('fWebChips');
             if (!box) return;
             box.innerHTML = fSelectedWebsites.map(w =>
-                `<span class="web-chip">${w}<b onclick="removeFWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
+                `<span class="web-chip">${webName(w)}<b onclick="removeFWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
             ).join('');
         }
         function renderFWebOptions() {
@@ -3918,7 +3929,7 @@
             if (!box) return;
             box.innerHTML = fWebList.map(w =>
                 `<label class="fweb-opt" data-web="${w.toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer; border-radius:6px;">
-                    <input type="checkbox" value="${w}" onchange="toggleFWebOption(this)" ${fSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
+                    <input type="checkbox" value="${w}" onchange="toggleFWebOption(this)" ${fSelectedWebsites.includes(w) ? 'checked' : ''}> ${webName(w)}
                  </label>`).join('');
         }
         function filterFWebOptions() {
@@ -4332,7 +4343,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; ${i < topWebsites.length - 1 ? 'border-bottom: 1px solid var(--border);' : ''}">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="color: var(--text-light); font-weight: 500; min-width: 20px;">${i + 1}.</span>
-                                <span>${w.name}</span>
+                                <span>${webName(w.name)}</span>
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-weight: 600; color: var(--primary);">${w.orders.toLocaleString('vi-VN')} đơn</div>
