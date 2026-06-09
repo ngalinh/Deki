@@ -1121,12 +1121,6 @@
             <div id="cust-segment" class="section-hidden">
                 <div class="filters">
                     <div class="filters-row">
-                        <div class="search-box">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
-                            </svg>
-                            <input type="text" id="segSearch" placeholder="Tìm theo tên hoặc SĐT..." oninput="renderSegmentTable()">
-                        </div>
                         <select class="filter-select" id="segTimeFilter" onchange="renderSegmentTable()" title="Lọc đơn theo thời gian">
                             <option value="all">Tất cả thời gian</option>
                             <option value="month">Trong tháng</option>
@@ -1147,6 +1141,12 @@
                                 Website (<span id="segWebsiteCount">tất cả</span>)
                             </button>
                             <div id="segWebsiteDropdown" style="display:none; position:absolute; top:110%; left:0; z-index:60; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.12); max-height:280px; overflow:auto; min-width:240px; padding:8px;"></div>
+                        </div>
+                        <div class="search-box">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" id="segSearch" placeholder="Tìm theo tên hoặc SĐT..." oninput="renderSegmentTable()">
                         </div>
                     </div>
                 </div>
