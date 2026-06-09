@@ -1137,7 +1137,6 @@
                         </select>
                         <div style="position: relative;">
                             <button class="btn btn-secondary" type="button" onclick="toggleSegWebsiteDropdown(event)" id="segWebsiteBtn">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
                                 Website (<span id="segWebsiteCount">tất cả</span>)
                             </button>
                             <div id="segWebsiteDropdown" style="display:none; position:absolute; top:110%; left:0; z-index:60; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.12); max-height:280px; overflow:auto; min-width:240px; padding:8px;"></div>
@@ -2987,7 +2986,7 @@
 
             tbody.innerHTML = pageRows.map(r => {
                 const webChips = r.websites.length
-                    ? `<span class="websites-tag"><svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg> ${r.websites.length} web</span>
+                    ? `<span style="font-weight:500;">${r.websites.length} web</span>
                        <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.join(', ')}">${r.websites.join(', ')}</div>`
                     : '-';
                 const segBadge = isSi ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
