@@ -3894,17 +3894,49 @@
             if (tip) tip.style.display = 'none';
         }
 
-        // Populate dropdown Nhu cầu Website từ danh sách website trong đơn hàng
+        // Dropdown "Nhu cầu Website" tùy chỉnh: mở xuống, có ô search, list cuộn
+        let fWebList = [];
         function populateFollowWebsiteSelect() {
-            const sel = document.getElementById('fNhuCauWebsite');
-            if (!sel) return;
-            const cur = sel.value;
             const websites = new Set();
             allCustomers.forEach(c => (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); }));
-            sel.innerHTML = '<option value="">— Chọn —</option>' +
-                Array.from(websites).sort().map(w => `<option value="${w}">${w}</option>`).join('');
-            sel.value = cur;
+            fWebList = Array.from(websites).sort();
+            renderFWebOptions();
         }
+        function renderFWebOptions() {
+            const box = document.getElementById('fWebOptions');
+            if (!box) return;
+            const cur = document.getElementById('fNhuCauWebsite').value;
+            const rows = ['<div class="fweb-opt" data-web="" onclick="selectFWeb(\'\')" style="padding:6px 8px; font-size:13px; cursor:pointer; color:var(--text-light);">— Bỏ chọn —</div>']
+                .concat(fWebList.map(w =>
+                    `<div class="fweb-opt" data-web="${w.toLowerCase()}" onclick="selectFWeb('${w.replace(/'/g, "\\'")}')"
+                          style="padding:6px 8px; font-size:13px; cursor:pointer; border-radius:6px; ${w === cur ? 'background:rgba(0,188,212,0.12); color:var(--primary); font-weight:500;' : ''}">${w}</div>`));
+            box.innerHTML = rows.join('');
+        }
+        function filterFWebOptions() {
+            const q = (document.getElementById('fWebSearch').value || '').trim().toLowerCase();
+            document.querySelectorAll('#fWebOptions .fweb-opt').forEach(el => {
+                if (!el.dataset.web && q) { el.style.display = 'none'; return; }   // ẩn "Bỏ chọn" khi đang gõ
+                el.style.display = (!q || el.dataset.web.includes(q)) ? 'block' : 'none';
+            });
+        }
+        function selectFWeb(w) {
+            document.getElementById('fNhuCauWebsite').value = w;
+            document.getElementById('fWebBtn').textContent = w || '— Chọn —';
+            document.getElementById('fWebDropdown').style.display = 'none';
+            renderFWebOptions();
+        }
+        function toggleFWebDropdown(e) {
+            e.stopPropagation();
+            const dd = document.getElementById('fWebDropdown');
+            const opening = dd.style.display === 'none';
+            dd.style.display = opening ? 'block' : 'none';
+            if (opening) { const s = document.getElementById('fWebSearch'); s.value = ''; filterFWebOptions(); s.focus(); }
+        }
+        document.addEventListener('click', (e) => {
+            const dd = document.getElementById('fWebDropdown');
+            const btn = document.getElementById('fWebBtn');
+            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && e.target !== btn) dd.style.display = 'none';
+        });
 
         function renderTagPicker() {
             const box = document.getElementById('fTagList');
@@ -3943,7 +3975,11 @@
             document.getElementById('fFbLink').value = f ? f.fb_link : '';
             document.getElementById('fNguonKhach').value = f ? f.nguon_khach : '';
             document.getElementById('fNganhHang').value = f ? f.nganh_hang : '';
-            document.getElementById('fNhuCauWebsite').value = f ? f.nhu_cau_website : '';
+            const webVal = f ? (f.nhu_cau_website || '') : '';
+            document.getElementById('fNhuCauWebsite').value = webVal;
+            document.getElementById('fWebBtn').textContent = webVal || '— Chọn —';
+            document.getElementById('fWebDropdown').style.display = 'none';
+            renderFWebOptions();
             document.getElementById('fNhuCauSp').value = f ? f.nhu_cau_sp : '';
             document.getElementById('fTinhTrang').value = f ? (f.bought ? 'Đã mua hàng' : f.tinh_trang) : '';
             document.getElementById('fNgayLienHe').value = f ? f.ngay_lien_he : '';
@@ -4643,9 +4679,15 @@
                         </select>
                     </div>
                     <div><label class="cv-lbl">Nhu cầu Website</label>
-                        <select id="fNhuCauWebsite" class="filter-select" style="width:100%">
-                            <option value="">— Chọn —</option>
-                        </select>
+                        <div style="position:relative;">
+                            <input type="hidden" id="fNhuCauWebsite">
+                            <button type="button" id="fWebBtn" class="filter-select" style="width:100%; text-align:left; cursor:pointer;" onclick="toggleFWebDropdown(event)">— Chọn —</button>
+                            <div id="fWebDropdown" style="display:none; position:absolute; top:104%; left:0; right:0; z-index:70; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:8px;">
+                                <input type="text" id="fWebSearch" placeholder="Tìm website..." oninput="filterFWebOptions()"
+                                       style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;">
+                                <div id="fWebOptions" style="max-height:300px; overflow:auto;"></div>
+                            </div>
+                        </div>
                     </div>
                     <div><label class="cv-lbl">Nhu cầu SP</label><input type="text" id="fNhuCauSp" class="filter-select" style="width:100%"></div>
                     <div><label class="cv-lbl">Tình trạng</label>
