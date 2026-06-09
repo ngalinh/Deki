@@ -2859,7 +2859,7 @@
             ctv: ['CTV'],
             si: ['Sỉ nhỏ', 'Sỉ vừa', 'Sỉ to']
         };
-        let segSort = { col: 'revenue', dir: 'desc' };   // cột sort hiện tại
+        let segSort = { col: null, dir: null };   // null = không sort (giữ thứ tự mặc định: doanh thu giảm dần)
         let segSelectedWebsites = [];                     // website đang chọn (multi)
         let segCurrentPage = 1;
         const segPerPage = 20;
@@ -2877,7 +2877,7 @@
                 updateCustomerCount();
             } else {
                 segSelectedWebsites = [];
-                segSort = { col: 'revenue', dir: 'desc' };
+                segSort = { col: null, dir: null };
                 segCurrentPage = 1;
                 buildSegWebsiteDropdown();
                 document.getElementById('segWebsiteCount').textContent = 'tất cả';
@@ -2998,8 +2998,10 @@
         }
 
         function segSortBy(col) {
-            if (segSort.col === col) segSort.dir = segSort.dir === 'desc' ? 'asc' : 'desc';
-            else segSort = { col, dir: 'desc' };
+            // 3 trạng thái: chưa sort → desc → asc → tắt (về mặc định)
+            if (segSort.col !== col) segSort = { col, dir: 'desc' };
+            else if (segSort.dir === 'desc') segSort.dir = 'asc';
+            else segSort = { col: null, dir: null };   // click lần 3 → tắt sort
             renderSegmentTable();
         }
 
@@ -3043,22 +3045,25 @@
                 });
             });
 
-            // Sort
-            const dir = segSort.dir === 'desc' ? -1 : 1;
-            rows.sort((a, b) => {
-                let va, vb;
-                if (segSort.col === 'orders') { va = a.orders; vb = b.orders; }
-                else if (segSort.col === 'avg') { va = a.avg; vb = b.avg; }
-                else if (segSort.col === 'last') { va = a.lastOrder || ''; vb = b.lastOrder || ''; return dir * (va < vb ? -1 : va > vb ? 1 : 0); }
-                else { va = a.revenue; vb = b.revenue; }
-                return dir * (va - vb);
-            });
+            // Sort: chỉ khi có cột được chọn; không → giữ thứ tự mặc định (doanh thu giảm dần từ allCustomers)
+            if (segSort.col) {
+                const dir = segSort.dir === 'desc' ? -1 : 1;
+                rows.sort((a, b) => {
+                    let va, vb;
+                    if (segSort.col === 'orders') { va = a.orders; vb = b.orders; }
+                    else if (segSort.col === 'avg') { va = a.avg; vb = b.avg; }
+                    else if (segSort.col === 'last') { va = a.lastOrder || ''; vb = b.lastOrder || ''; return dir * (va < vb ? -1 : va > vb ? 1 : 0); }
+                    else { va = a.revenue; vb = b.revenue; }
+                    return dir * (va - vb);
+                });
+            }
 
-            // Header với icon sort
+            // Header với icon sort: chưa sort → ↕ (xám); đang sort → ▲/▼ (primary)
             const sortIcon = (col) => {
                 const active = segSort.col === col;
-                const arrow = active ? (segSort.dir === 'desc' ? '▾' : '▴') : '⇅';
-                return `<span style="cursor:pointer; user-select:none; color:${active ? 'var(--primary)' : 'var(--text-light)'};" onclick="segSortBy('${col}')"> ${arrow}</span>`;
+                const arrow = active ? (segSort.dir === 'desc' ? '▼' : '▲') : '⇅';
+                const title = active ? (segSort.dir === 'desc' ? 'Đang giảm dần — bấm để tăng dần' : 'Đang tăng dần — bấm để tắt sort') : 'Bấm để sắp xếp';
+                return `<span title="${title}" style="cursor:pointer; user-select:none; margin-left:3px; font-size:11px; color:${active ? 'var(--primary)' : 'var(--text-light)'};" onclick="segSortBy('${col}')">${arrow}</span>`;
             };
             document.getElementById('segTableHead').innerHTML = `
                 <th>Khách hàng</th>
