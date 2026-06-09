@@ -19,6 +19,11 @@ app.use(express.json({ limit: '50mb' }));
 
 // ===== Serve frontend (root-level files) =====
 const ROOT_DIR = path.resolve(__dirname, '..');
+// Không cache index.html → mỗi lần reload luôn lấy bản mới nhất (tránh dính JS cũ)
+app.use((req, res, next) => {
+    if (req.path === '/' || req.path.endsWith('.html')) res.set('Cache-Control', 'no-store');
+    next();
+});
 app.use(express.static(ROOT_DIR, { index: false }));
 
 // Helper middleware: chỉ cho admin
@@ -787,6 +792,7 @@ app.delete('/api/handover/:id', requireAuth(), async (req, res) => {
 
 // SPA fallback: gửi index.html cho mọi route không match (trừ /api)
 app.get(/^(?!\/api|\/health).*/, (req, res) => {
+    res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(ROOT_DIR, 'index.html'));
 });
 
