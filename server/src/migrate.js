@@ -120,6 +120,13 @@ async function runMigrations() {
             console.error('[migrate] order cols migration error:', e.message);
         }
 
+        // Migration: nhu_cau_website đổi sang TEXT (lưu nhiều website dạng JSON)
+        try {
+            await pool.query(`ALTER TABLE deki_follow_customers MODIFY COLUMN nhu_cau_website TEXT`).catch(() => {});
+        } catch (e) {
+            console.error('[migrate] nhu_cau_website migration error:', e.message);
+        }
+
         // Seed preset tags cho Follow khách
         try {
             for (const tag of ['Tiềm năng', 'Khách VIP']) {

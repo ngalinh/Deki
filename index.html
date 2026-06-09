@@ -3851,7 +3851,7 @@
                         <td>${fbHtml}</td>
                         <td style="color:var(--text-gray);">${c.nguon_khach || '-'}</td>
                         <td style="color:var(--text-gray);">${c.nganh_hang || '-'}</td>
-                        <td style="color:var(--text-gray);">${c.nhu_cau_website || '-'}</td>
+                        <td style="color:var(--text-gray);">${(Array.isArray(c.nhu_cau_website) && c.nhu_cau_website.length) ? c.nhu_cau_website.map(w => `<span class="row-tag">${w}</span>`).join('') : '-'}</td>
                         <td style="color:var(--text-gray);">${c.nhu_cau_sp || '-'}</td>
                         <td>${statusBadge}</td>
                         <td>${lastContact ? `<span class="cv-history" onmouseenter="showHist(event, ${c.id})" onmousemove="moveHist(event)" onmouseleave="hideHist()">${fmtDateVN(lastContact)}${hasHist ? ` <span style="color:var(--text-light); font-size:11px;">(${c.history.length})</span>` : ''}</span>` : '-'}</td>
@@ -3894,48 +3894,66 @@
             if (tip) tip.style.display = 'none';
         }
 
-        // Dropdown "Nhu cầu Website" tùy chỉnh: mở xuống, có ô search, list cuộn
+        // "Nhu cầu Website" multi-select chips: tích nhiều web, có search, mở xuống
         let fWebList = [];
+        let fSelectedWebsites = [];
         function populateFollowWebsiteSelect() {
             const websites = new Set();
             allCustomers.forEach(c => (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); }));
             fWebList = Array.from(websites).sort();
             renderFWebOptions();
+            renderFWebChips();
+        }
+        function renderFWebChips() {
+            const box = document.getElementById('fWebChips');
+            if (!box) return;
+            box.innerHTML = fSelectedWebsites.map(w =>
+                `<span class="web-chip">${w}<b onclick="removeFWeb(event, '${w.replace(/'/g, "\\'")}')">×</b></span>`
+            ).join('');
         }
         function renderFWebOptions() {
             const box = document.getElementById('fWebOptions');
             if (!box) return;
-            const cur = document.getElementById('fNhuCauWebsite').value;
-            const rows = ['<div class="fweb-opt" data-web="" onclick="selectFWeb(\'\')" style="padding:6px 8px; font-size:13px; cursor:pointer; color:var(--text-light);">— Bỏ chọn —</div>']
-                .concat(fWebList.map(w =>
-                    `<div class="fweb-opt" data-web="${w.toLowerCase()}" onclick="selectFWeb('${w.replace(/'/g, "\\'")}')"
-                          style="padding:6px 8px; font-size:13px; cursor:pointer; border-radius:6px; ${w === cur ? 'background:rgba(0,188,212,0.12); color:var(--primary); font-weight:500;' : ''}">${w}</div>`));
-            box.innerHTML = rows.join('');
+            box.innerHTML = fWebList.map(w =>
+                `<label class="fweb-opt" data-web="${w.toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer; border-radius:6px;">
+                    <input type="checkbox" value="${w}" onchange="toggleFWebOption(this)" ${fSelectedWebsites.includes(w) ? 'checked' : ''}> ${w}
+                 </label>`).join('');
         }
         function filterFWebOptions() {
             const q = (document.getElementById('fWebSearch').value || '').trim().toLowerCase();
             document.querySelectorAll('#fWebOptions .fweb-opt').forEach(el => {
-                if (!el.dataset.web && q) { el.style.display = 'none'; return; }   // ẩn "Bỏ chọn" khi đang gõ
-                el.style.display = (!q || el.dataset.web.includes(q)) ? 'block' : 'none';
+                el.style.display = (!q || el.dataset.web.includes(q)) ? 'flex' : 'none';
             });
         }
-        function selectFWeb(w) {
-            document.getElementById('fNhuCauWebsite').value = w;
-            document.getElementById('fWebBtn').textContent = w || '— Chọn —';
-            document.getElementById('fWebDropdown').style.display = 'none';
-            renderFWebOptions();
+        function toggleFWebOption(cb) {
+            if (cb.checked) { if (!fSelectedWebsites.includes(cb.value)) fSelectedWebsites.push(cb.value); }
+            else fSelectedWebsites = fSelectedWebsites.filter(w => w !== cb.value);
+            renderFWebChips();
+            const s = document.getElementById('fWebSearch');
+            if (s) { s.value = ''; filterFWebOptions(); s.focus(); }
         }
-        function toggleFWebDropdown(e) {
-            e.stopPropagation();
+        function removeFWeb(e, w) {
+            if (e) e.stopPropagation();
+            fSelectedWebsites = fSelectedWebsites.filter(x => x !== w);
+            const cb = document.querySelector(`#fWebOptions input[type=checkbox][value="${w.replace(/"/g, '\\"')}"]`);
+            if (cb) cb.checked = false;
+            renderFWebChips();
+        }
+        function fWebKeydown(e) {
+            if (e.key === 'Backspace' && !e.target.value && fSelectedWebsites.length) {
+                removeFWeb(e, fSelectedWebsites[fSelectedWebsites.length - 1]);
+            }
+        }
+        function openFWebDropdown(e) {
+            // click trong box (trừ khi bấm × của chip) → mở dropdown + focus search
             const dd = document.getElementById('fWebDropdown');
-            const opening = dd.style.display === 'none';
-            dd.style.display = opening ? 'block' : 'none';
-            if (opening) { const s = document.getElementById('fWebSearch'); s.value = ''; filterFWebOptions(); s.focus(); }
+            dd.style.display = 'block';
+            const s = document.getElementById('fWebSearch'); s.focus();
         }
         document.addEventListener('click', (e) => {
             const dd = document.getElementById('fWebDropdown');
-            const btn = document.getElementById('fWebBtn');
-            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && e.target !== btn) dd.style.display = 'none';
+            const box = document.getElementById('fWebBox');
+            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && box && !box.contains(e.target)) dd.style.display = 'none';
         });
 
         function renderTagPicker() {
@@ -3975,11 +3993,11 @@
             document.getElementById('fFbLink').value = f ? f.fb_link : '';
             document.getElementById('fNguonKhach').value = f ? f.nguon_khach : '';
             document.getElementById('fNganhHang').value = f ? f.nganh_hang : '';
-            const webVal = f ? (f.nhu_cau_website || '') : '';
-            document.getElementById('fNhuCauWebsite').value = webVal;
-            document.getElementById('fWebBtn').textContent = webVal || '— Chọn —';
+            fSelectedWebsites = f ? [...(Array.isArray(f.nhu_cau_website) ? f.nhu_cau_website : (f.nhu_cau_website ? [f.nhu_cau_website] : []))] : [];
             document.getElementById('fWebDropdown').style.display = 'none';
+            document.getElementById('fWebSearch').value = '';
             renderFWebOptions();
+            renderFWebChips();
             document.getElementById('fNhuCauSp').value = f ? f.nhu_cau_sp : '';
             document.getElementById('fTinhTrang').value = f ? (f.bought ? 'Đã mua hàng' : f.tinh_trang) : '';
             document.getElementById('fNgayLienHe').value = f ? f.ngay_lien_he : '';
@@ -4002,7 +4020,7 @@
                 fb_link: document.getElementById('fFbLink').value.trim(),
                 nguon_khach: document.getElementById('fNguonKhach').value,
                 nganh_hang: document.getElementById('fNganhHang').value,
-                nhu_cau_website: document.getElementById('fNhuCauWebsite').value,
+                nhu_cau_website: fSelectedWebsites,
                 nhu_cau_sp: document.getElementById('fNhuCauSp').value.trim(),
                 tinh_trang: document.getElementById('fTinhTrang').value,
                 ngay_lien_he: document.getElementById('fNgayLienHe').value || null,
@@ -4680,11 +4698,11 @@
                     </div>
                     <div><label class="cv-lbl">Nhu cầu Website</label>
                         <div style="position:relative;">
-                            <input type="hidden" id="fNhuCauWebsite">
-                            <button type="button" id="fWebBtn" class="filter-select" style="width:100%; text-align:left; cursor:pointer;" onclick="toggleFWebDropdown(event)">— Chọn —</button>
+                            <div id="fWebBox" class="chips-input" onclick="openFWebDropdown(event)" style="min-height:36px;">
+                                <span id="fWebChips"></span>
+                                <input type="text" id="fWebSearch" placeholder="Tìm / chọn website..." oninput="filterFWebOptions()" onkeydown="fWebKeydown(event)">
+                            </div>
                             <div id="fWebDropdown" style="display:none; position:absolute; top:104%; left:0; right:0; z-index:70; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:8px;">
-                                <input type="text" id="fWebSearch" placeholder="Tìm website..." oninput="filterFWebOptions()"
-                                       style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;">
                                 <div id="fWebOptions" style="max-height:300px; overflow:auto;"></div>
                             </div>
                         </div>
