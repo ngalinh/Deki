@@ -3045,7 +3045,11 @@
                 });
             });
 
-            // Sort: chỉ khi có cột được chọn; không → giữ thứ tự mặc định (doanh thu giảm dần từ allCustomers)
+            // Sort:
+            //  - Nếu user chọn cột sort → theo cột đó
+            //  - Nếu chưa chọn nhưng đang bật lọc "Đơn gần nhất" → tự xếp theo đơn gần nhất giảm dần
+            //  - Còn lại → giữ thứ tự mặc định (doanh thu giảm dần từ allCustomers)
+            const lastFilterActive = document.getElementById('segLastOrderFilter').value !== 'all';
             if (segSort.col) {
                 const dir = segSort.dir === 'desc' ? -1 : 1;
                 rows.sort((a, b) => {
@@ -3056,6 +3060,8 @@
                     else { va = a.revenue; vb = b.revenue; }
                     return dir * (va - vb);
                 });
+            } else if (lastFilterActive) {
+                rows.sort((a, b) => (b.lastOrder || '').localeCompare(a.lastOrder || ''));
             }
 
             // Header với icon sort: chưa sort → ↕ (xám); đang sort → ▲/▼ (primary)
