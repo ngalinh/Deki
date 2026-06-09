@@ -96,6 +96,15 @@ async function runMigrations() {
             );
             console.log(`[migrate] Super admin ready: ${superAdmin}`);
         }
+
+        // Seed preset tags cho Follow khách
+        try {
+            for (const tag of ['Tiềm năng', 'Khách VIP']) {
+                await pool.query(`INSERT IGNORE INTO deki_follow_tags (name) VALUES (?)`, [tag]);
+            }
+        } catch (e) {
+            console.error('[migrate] seed tags error:', e.message);
+        }
     } catch (err) {
         console.error('[migrate] Error:', err.message);
         throw err;

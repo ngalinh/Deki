@@ -762,6 +762,13 @@
             border-radius: 6px;
             display: inline-block;
         }
+        .cv-lbl { display:block; font-size:13px; font-weight:500; color:var(--text-gray); margin-bottom:6px; }
+        .tag-chip { padding:4px 10px; border-radius:14px; font-size:12px; border:1px solid var(--border); cursor:pointer; user-select:none; background:white; color:var(--text-gray); }
+        .tag-chip.selected { background:rgba(0,188,212,0.12); border-color:var(--primary); color:var(--primary); font-weight:500; }
+        .cv-history { position:relative; cursor:help; border-bottom:1px dashed var(--text-light); }
+        .cv-history .cv-tip { display:none; position:absolute; left:0; bottom:120%; z-index:50; background:var(--secondary); color:white; padding:10px 12px; border-radius:8px; font-size:12px; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,0.25); }
+        .cv-history:hover .cv-tip { display:block; }
+        .row-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:rgba(0,188,212,0.1); color:var(--primary); margin:1px; }
     </style>
 </head>
 <body>
@@ -807,6 +814,14 @@
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                 </svg>
                 Lọc khách hàng
+            </a>
+
+            <a href="#" class="nav-item" onclick="showView('congviec')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                Công việc
             </a>
 
             <a href="#" class="nav-item section-hidden" id="navAdmin" onclick="showView('admin')">
@@ -1291,6 +1306,122 @@
                 </table>
             </div>
         </div>
+
+        <!-- Công việc View -->
+        <div id="congviec-view" class="section-hidden">
+            <div class="header">
+                <div>
+                    <h2>Công việc</h2>
+                    <p style="color: var(--text-gray); font-size: 14px; margin-top: 4px;">Quản lý follow khách & bàn giao công việc</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="cvAddBtn" onclick="openCvAdd()">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span id="cvAddBtnLabel">Thêm khách hàng</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sub-tabs -->
+            <div class="view-toggle" style="margin-bottom: 20px; display: inline-flex;">
+                <button class="view-btn active" id="cvTabFollow" onclick="switchCvTab('follow')">Follow khách</button>
+                <button class="view-btn" id="cvTabHandover" onclick="switchCvTab('handover')">Bàn giao</button>
+            </div>
+
+            <!-- ===== Follow khách ===== -->
+            <div id="cv-follow">
+                <div class="filters" style="margin-bottom: 16px;">
+                    <div class="search-box" style="max-width: 360px;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="followSearch" placeholder="Tìm theo tên hoặc SĐT..." oninput="renderFollowTable()">
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Khách hàng</th>
+                                <th>SĐT</th>
+                                <th>Link FB</th>
+                                <th>Nguồn khách</th>
+                                <th>Ngành hàng</th>
+                                <th>Nhu cầu Website</th>
+                                <th>Nhu cầu SP</th>
+                                <th>Tình trạng</th>
+                                <th>Ngày liên hệ</th>
+                                <th>Tag</th>
+                                <th>Ghi chú</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="followTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ===== Bàn giao ===== -->
+            <div id="cv-handover" class="section-hidden">
+                <div class="filters" style="margin-bottom: 16px;">
+                    <div class="filters-row">
+                        <div>
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Từ ngày</label>
+                            <input type="date" id="hoFrom" class="filter-select">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Đến ngày</label>
+                            <input type="date" id="hoTo" class="filter-select">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Task</label>
+                            <select id="hoTask" class="filter-select">
+                                <option value="">Tất cả task</option>
+                                <option>Giao hàng</option>
+                                <option>Xử lý issue</option>
+                                <option>Hàng stock</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Tình trạng</label>
+                            <select id="hoStatus" class="filter-select">
+                                <option value="">Tất cả</option>
+                                <option value="pending">Pending</option>
+                                <option value="done">Done</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Người làm</label>
+                            <select id="hoNguoiLam" class="filter-select">
+                                <option value="">Tất cả</option>
+                                <option value="CSKH">CSKH</option>
+                                <option value="SALE">SALE</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" style="align-self: end;" onclick="loadHandover()">Lọc</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>STT</th>
+                                <th>Ngày tháng</th>
+                                <th>Task</th>
+                                <th>Công việc</th>
+                                <th>Tình trạng</th>
+                                <th>Người làm</th>
+                                <th>Ghi chú</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="handoverTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1301,12 +1432,14 @@
             document.getElementById('reports-view').classList.add('section-hidden');
             document.getElementById('filters-view').classList.add('section-hidden');
             document.getElementById('admin-view')?.classList.add('section-hidden');
+            document.getElementById('congviec-view')?.classList.add('section-hidden');
 
             // Show selected view
             document.getElementById(viewName + '-view').classList.remove('section-hidden');
 
             // Lazy-load data cho admin view
             if (viewName === 'admin') loadPermissions();
+            if (viewName === 'congviec') loadCongViec();
 
             // Update active nav
             document.querySelectorAll('.nav-item').forEach(item => {
@@ -1666,6 +1799,8 @@
             if (e.target.id === 'allWebsitesModal') {
                 closeAllWebsitesModal();
             }
+            if (e.target.id === 'followModal') closeFollowModal();
+            if (e.target.id === 'handoverModal') closeHandoverModal();
         });
 
         // Data từ phân tích DS_DONHANG.xlsx
@@ -2981,6 +3116,299 @@
             return data;
         }
 
+        async function apiPut(path, body) {
+            const res = await fetch(apiUrl(path), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(body)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            return data;
+        }
+
+        // ===== CÔNG VIỆC =====
+        let cvTab = 'follow';
+        let followData = [];
+        let followTags = [];        // tag có sẵn (preset + custom)
+        let selectedTags = [];      // tag đang chọn trong popup
+        let handoverData = [];
+
+        function switchCvTab(tab) {
+            cvTab = tab;
+            document.getElementById('cvTabFollow').classList.toggle('active', tab === 'follow');
+            document.getElementById('cvTabHandover').classList.toggle('active', tab === 'handover');
+            document.getElementById('cv-follow').classList.toggle('section-hidden', tab !== 'follow');
+            document.getElementById('cv-handover').classList.toggle('section-hidden', tab !== 'handover');
+            document.getElementById('cvAddBtnLabel').textContent = tab === 'follow' ? 'Thêm khách hàng' : 'Tạo việc';
+        }
+
+        function openCvAdd() {
+            if (cvTab === 'follow') openFollowModal();
+            else openHandoverModal();
+        }
+
+        async function loadCongViec() {
+            await Promise.all([loadFollow(), loadFollowTags(), loadHandover()]);
+        }
+
+        // ---------- Follow khách ----------
+        async function loadFollow() {
+            try {
+                const r = await apiGet('/api/follow');
+                followData = r.data || [];
+                renderFollowTable();
+            } catch (e) { showToast('error', 'Lỗi tải Follow khách', e.message); }
+        }
+
+        async function loadFollowTags() {
+            try {
+                const r = await apiGet('/api/follow-tags');
+                followTags = r.data || [];
+            } catch (e) { followTags = []; }
+        }
+
+        function fmtDateVN(ymd) {
+            if (!ymd) return '';
+            const [y, m, d] = ymd.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        function renderFollowTable() {
+            const tbody = document.getElementById('followTableBody');
+            if (!tbody) return;
+            const q = removeDiacritics((document.getElementById('followSearch').value || '').trim()).toLowerCase();
+            const rows = followData.filter(c => {
+                if (!q) return true;
+                return removeDiacritics(c.name).toLowerCase().includes(q) || (c.phone || '').includes(q);
+            });
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có khách hàng nào</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(c => {
+                const histTip = (c.history || []).length
+                    ? c.history.map(h => `${fmtDateVN(h.ngay_lien_he) || '?'}: ${h.tinh_trang || '-'}`).join('<br>')
+                    : 'Chưa có lịch sử';
+                const tagsHtml = (c.tags || []).map(t => `<span class="row-tag">${t}</span>`).join('') || '-';
+                const fbHtml = c.fb_link ? `<a href="${c.fb_link}" target="_blank" style="color:var(--primary);">Link</a>` : '-';
+                const statusBadge = c.bought
+                    ? '<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--success);">Đã mua hàng</span>'
+                    : (c.tinh_trang ? `<span class="badge khach-le">${c.tinh_trang}</span>` : '-');
+                return `
+                    <tr>
+                        <td><div class="customer-name">${c.name}</div>${c.nhom_khach ? `<div style="font-size:12px; color:var(--text-light);">${c.nhom_khach}</div>` : ''}</td>
+                        <td style="color:var(--text-gray);">${c.phone || '-'}</td>
+                        <td>${fbHtml}</td>
+                        <td style="color:var(--text-gray);">${c.nguon_khach || '-'}</td>
+                        <td style="color:var(--text-gray);">${c.nganh_hang || '-'}</td>
+                        <td style="color:var(--text-gray);">${c.nhu_cau_website || '-'}</td>
+                        <td style="color:var(--text-gray);">${c.nhu_cau_sp || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td><span class="cv-history">${fmtDateVN(c.ngay_lien_he) || '-'}<span class="cv-tip">${histTip}</span></span></td>
+                        <td>${tagsHtml}</td>
+                        <td style="color:var(--text-gray); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(c.ghi_chu||'').replace(/"/g,'&quot;')}">${c.ghi_chu || '-'}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="openFollowModal(${c.id})">Sửa</button>
+                            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px; color:var(--error); border-color:var(--error);" onclick="deleteFollow(${c.id})">Xóa</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        // Populate dropdown Nhu cầu Website từ danh sách website trong đơn hàng
+        function populateFollowWebsiteSelect() {
+            const sel = document.getElementById('fNhuCauWebsite');
+            if (!sel) return;
+            const cur = sel.value;
+            const websites = new Set();
+            allCustomers.forEach(c => (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); }));
+            sel.innerHTML = '<option value="">— Chọn —</option>' +
+                Array.from(websites).sort().map(w => `<option value="${w}">${w}</option>`).join('');
+            sel.value = cur;
+        }
+
+        function renderTagPicker() {
+            const box = document.getElementById('fTagList');
+            box.innerHTML = followTags.map(t =>
+                `<span class="tag-chip ${selectedTags.includes(t) ? 'selected' : ''}" onclick="toggleTag('${t.replace(/'/g, "\\'")}')">${t}</span>`
+            ).join('') || '<span style="color:var(--text-light); font-size:12px;">Chưa có tag</span>';
+        }
+
+        function toggleTag(t) {
+            const i = selectedTags.indexOf(t);
+            if (i === -1) selectedTags.push(t); else selectedTags.splice(i, 1);
+            renderTagPicker();
+        }
+
+        async function addCustomTag() {
+            const inp = document.getElementById('fNewTag');
+            const name = (inp.value || '').trim();
+            if (!name) return;
+            try {
+                await apiPost('/api/follow-tags', { name });
+                if (!followTags.includes(name)) followTags.push(name);
+                if (!selectedTags.includes(name)) selectedTags.push(name);
+                inp.value = '';
+                renderTagPicker();
+            } catch (e) { showToast('error', 'Lỗi tạo tag', e.message); }
+        }
+
+        function openFollowModal(id) {
+            populateFollowWebsiteSelect();
+            const f = id ? followData.find(c => c.id === id) : null;
+            document.getElementById('followModalTitle').textContent = f ? 'Sửa khách hàng' : 'Thêm khách hàng';
+            document.getElementById('fEditId').value = f ? f.id : '';
+            document.getElementById('fName').value = f ? f.name : '';
+            document.getElementById('fNhomKhach').value = f ? f.nhom_khach : '';
+            document.getElementById('fPhone').value = f ? f.phone : '';
+            document.getElementById('fFbLink').value = f ? f.fb_link : '';
+            document.getElementById('fNguonKhach').value = f ? f.nguon_khach : '';
+            document.getElementById('fNganhHang').value = f ? f.nganh_hang : '';
+            document.getElementById('fNhuCauWebsite').value = f ? f.nhu_cau_website : '';
+            document.getElementById('fNhuCauSp').value = f ? f.nhu_cau_sp : '';
+            document.getElementById('fTinhTrang').value = f ? (f.bought ? 'Đã mua hàng' : f.tinh_trang) : '';
+            document.getElementById('fNgayLienHe').value = f ? f.ngay_lien_he : '';
+            document.getElementById('fGhiChu').value = f ? f.ghi_chu : '';
+            selectedTags = f ? [...(f.tags || [])] : [];
+            renderTagPicker();
+            document.getElementById('followModal').classList.add('active');
+        }
+
+        function closeFollowModal() {
+            document.getElementById('followModal').classList.remove('active');
+        }
+
+        async function saveFollow() {
+            const id = document.getElementById('fEditId').value;
+            const body = {
+                name: document.getElementById('fName').value.trim(),
+                nhom_khach: document.getElementById('fNhomKhach').value,
+                phone: document.getElementById('fPhone').value.trim(),
+                fb_link: document.getElementById('fFbLink').value.trim(),
+                nguon_khach: document.getElementById('fNguonKhach').value,
+                nganh_hang: document.getElementById('fNganhHang').value,
+                nhu_cau_website: document.getElementById('fNhuCauWebsite').value,
+                nhu_cau_sp: document.getElementById('fNhuCauSp').value.trim(),
+                tinh_trang: document.getElementById('fTinhTrang').value,
+                ngay_lien_he: document.getElementById('fNgayLienHe').value || null,
+                tags: selectedTags,
+                ghi_chu: document.getElementById('fGhiChu').value.trim()
+            };
+            if (!body.name) { showToast('error', 'Thiếu thông tin', 'Vui lòng nhập tên khách hàng'); return; }
+            try {
+                if (id) await apiPut('/api/follow/' + id, body);
+                else await apiPost('/api/follow', body);
+                closeFollowModal();
+                showToast('success', 'Đã lưu', `Khách hàng ${body.name}`);
+                await loadFollow();
+            } catch (e) { showToast('error', 'Lỗi lưu', e.message); }
+        }
+
+        async function deleteFollow(id) {
+            if (!confirm('Xóa khách hàng follow này?')) return;
+            try {
+                await apiDelete('/api/follow/' + id);
+                showToast('success', 'Đã xóa', '');
+                await loadFollow();
+            } catch (e) { showToast('error', 'Lỗi xóa', e.message); }
+        }
+
+        // ---------- Bàn giao ----------
+        async function loadHandover() {
+            try {
+                const params = new URLSearchParams();
+                const from = document.getElementById('hoFrom')?.value;
+                const to = document.getElementById('hoTo')?.value;
+                const task = document.getElementById('hoTask')?.value;
+                const st = document.getElementById('hoStatus')?.value;
+                const nl = document.getElementById('hoNguoiLam')?.value;
+                if (from) params.set('from', from);
+                if (to) params.set('to', to);
+                if (task) params.set('task', task);
+                if (st) params.set('tinh_trang', st);
+                if (nl) params.set('nguoi_lam', nl);
+                const qs = params.toString();
+                const r = await apiGet('/api/handover' + (qs ? '?' + qs : ''));
+                handoverData = r.data || [];
+                renderHandoverTable();
+            } catch (e) { showToast('error', 'Lỗi tải Bàn giao', e.message); }
+        }
+
+        function renderHandoverTable() {
+            const tbody = document.getElementById('handoverTableBody');
+            if (!tbody) return;
+            if (handoverData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có công việc nào</td></tr>';
+                return;
+            }
+            tbody.innerHTML = handoverData.map((t, i) => {
+                const statusBadge = t.tinh_trang === 'done'
+                    ? '<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--success);">Done</span>'
+                    : '<span class="badge" style="background:rgba(245,158,11,0.12); color:var(--warning);">Pending</span>';
+                return `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td style="color:var(--text-gray);">${fmtDateVN(t.ngay_thang) || '-'}</td>
+                        <td>${t.task || '-'}</td>
+                        <td style="color:var(--text-gray); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(t.cong_viec||'').replace(/"/g,'&quot;')}">${t.cong_viec || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td style="color:var(--text-gray);">${t.nguoi_lam || '-'}</td>
+                        <td style="color:var(--text-gray); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(t.ghi_chu||'').replace(/"/g,'&quot;')}">${t.ghi_chu || '-'}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="openHandoverModal(${t.id})">Sửa</button>
+                            <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px; color:var(--error); border-color:var(--error);" onclick="deleteHandover(${t.id})">Xóa</button>
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        function openHandoverModal(id) {
+            const t = id ? handoverData.find(x => x.id === id) : null;
+            document.getElementById('handoverModalTitle').textContent = t ? 'Sửa việc' : 'Tạo việc';
+            document.getElementById('hEditId').value = t ? t.id : '';
+            document.getElementById('hNgayThang').value = t ? t.ngay_thang : '';
+            document.getElementById('hTask').value = t ? t.task : '';
+            document.getElementById('hNguoiLam').value = t ? t.nguoi_lam : '';
+            document.getElementById('hTinhTrang').value = t ? t.tinh_trang : 'pending';
+            document.getElementById('hCongViec').value = t ? t.cong_viec : '';
+            document.getElementById('hGhiChu').value = t ? t.ghi_chu : '';
+            document.getElementById('handoverModal').classList.add('active');
+        }
+
+        function closeHandoverModal() {
+            document.getElementById('handoverModal').classList.remove('active');
+        }
+
+        async function saveHandover() {
+            const id = document.getElementById('hEditId').value;
+            const body = {
+                ngay_thang: document.getElementById('hNgayThang').value || null,
+                task: document.getElementById('hTask').value,
+                cong_viec: document.getElementById('hCongViec').value.trim(),
+                tinh_trang: document.getElementById('hTinhTrang').value,
+                nguoi_lam: document.getElementById('hNguoiLam').value,
+                ghi_chu: document.getElementById('hGhiChu').value.trim()
+            };
+            try {
+                if (id) await apiPut('/api/handover/' + id, body);
+                else await apiPost('/api/handover', body);
+                closeHandoverModal();
+                showToast('success', 'Đã lưu', 'Công việc');
+                await loadHandover();
+            } catch (e) { showToast('error', 'Lỗi lưu', e.message); }
+        }
+
+        async function deleteHandover(id) {
+            if (!confirm('Xóa công việc này?')) return;
+            try {
+                await apiDelete('/api/handover/' + id);
+                showToast('success', 'Đã xóa', '');
+                await loadHandover();
+            } catch (e) { showToast('error', 'Lỗi xóa', e.message); }
+        }
+
         async function loadPermissions() {
             try {
                 // Load song song: permissions + danh sách nhân viên trong DB
@@ -3496,6 +3924,117 @@
                 <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="color: var(--text-gray); font-size: 14px;" id="allOrdersPaginationInfo"></div>
                     <div style="display: flex; gap: 8px;" id="allOrdersPaginationControls"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Follow khách: Add/Edit modal -->
+    <div class="modal-overlay" id="followModal">
+        <div class="modal-content" style="max-width: 640px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="followModalTitle">Thêm khách hàng</h2>
+                <button class="modal-close" onclick="closeFollowModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="fEditId">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div><label class="cv-lbl">Tên khách hàng *</label><input type="text" id="fName" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Nhóm khách</label>
+                        <select id="fNhomKhach" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option value="Khách lẻ">Khách lẻ</option>
+                            <option value="CTV">CTV</option>
+                            <option value="Seller">Seller</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">SĐT</label><input type="text" id="fPhone" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Link FB</label><input type="text" id="fFbLink" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Nguồn khách</label>
+                        <select id="fNguonKhach" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option>Facebook</option><option>Zalo</option><option>Tiktok</option><option>Instagram</option><option>Threads</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Ngành hàng</label>
+                        <select id="fNganhHang" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option>Order</option><option>Nhập hàng</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Nhu cầu Website</label>
+                        <select id="fNhuCauWebsite" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Nhu cầu SP</label><input type="text" id="fNhuCauSp" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Tình trạng</label>
+                        <select id="fTinhTrang" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option>Inbox khách</option><option>Khách inbox</option><option>Mời deal</option>
+                            <option>Mời hàng stock</option><option>Đã mua hàng</option><option>Dừng inbox</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Ngày liên hệ</label><input type="date" id="fNgayLienHe" class="filter-select" style="width:100%"></div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <label class="cv-lbl">Tag</label>
+                    <div id="fTagList" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="fNewTag" class="filter-select" style="flex:1" placeholder="Tạo tag mới...">
+                        <button class="btn btn-secondary" onclick="addCustomTag()">+ Tag</button>
+                    </div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <label class="cv-lbl">Ghi chú</label>
+                    <textarea id="fGhiChu" class="filter-select" style="width:100%; min-height:60px; resize:vertical;"></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                    <button class="btn btn-secondary" onclick="closeFollowModal()">Hủy</button>
+                    <button class="btn btn-primary" onclick="saveFollow()">Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bàn giao: Add/Edit modal -->
+    <div class="modal-overlay" id="handoverModal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h2 class="modal-title" id="handoverModalTitle">Tạo việc</h2>
+                <button class="modal-close" onclick="closeHandoverModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="hEditId">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div><label class="cv-lbl">Ngày tháng</label><input type="date" id="hNgayThang" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Task</label>
+                        <select id="hTask" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option>Giao hàng</option><option>Xử lý issue</option><option>Hàng stock</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Người làm</label>
+                        <select id="hNguoiLam" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option value="CSKH">CSKH</option><option value="SALE">SALE</option>
+                        </select>
+                    </div>
+                    <div><label class="cv-lbl">Tình trạng</label>
+                        <select id="hTinhTrang" class="filter-select" style="width:100%">
+                            <option value="pending">Pending</option><option value="done">Done</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top:14px;"><label class="cv-lbl">Công việc</label><textarea id="hCongViec" class="filter-select" style="width:100%; min-height:60px; resize:vertical;"></textarea></div>
+                <div style="margin-top:14px;"><label class="cv-lbl">Ghi chú</label><textarea id="hGhiChu" class="filter-select" style="width:100%; min-height:50px; resize:vertical;"></textarea></div>
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                    <button class="btn btn-secondary" onclick="closeHandoverModal()">Hủy</button>
+                    <button class="btn btn-primary" onclick="saveHandover()">Lưu</button>
                 </div>
             </div>
         </div>

@@ -47,3 +47,59 @@ CREATE TABLE IF NOT EXISTS deki_permissions (
     is_admin TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===== CÔNG VIỆC: Follow khách =====
+CREATE TABLE IF NOT EXISTS deki_follow_customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(32),
+    nhom_khach VARCHAR(32),           -- khach_le / ctv / seller
+    fb_link VARCHAR(512),
+    nguon_khach VARCHAR(32),          -- Facebook / Zalo / Tiktok / Instagram / Threads
+    nganh_hang VARCHAR(32),           -- Order / Nhập hàng
+    nhu_cau_website VARCHAR(255),
+    nhu_cau_sp TEXT,
+    tinh_trang VARCHAR(64),           -- Inbox khách / Khách inbox / Mời deal / Mời hàng stock / Đã mua hàng / Dừng inbox
+    ngay_lien_he DATE,
+    tags TEXT,                        -- JSON array string
+    ghi_chu TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_phone (phone),
+    INDEX idx_tinh_trang (tinh_trang)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Lịch sử liên hệ (mỗi lần đổi tình trạng + ngày liên hệ → 1 dòng)
+CREATE TABLE IF NOT EXISTS deki_follow_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    follow_id INT NOT NULL,
+    tinh_trang VARCHAR(64),
+    ngay_lien_he DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (follow_id) REFERENCES deki_follow_customers(id) ON DELETE CASCADE,
+    INDEX idx_follow (follow_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tag tùy chỉnh cho Follow khách (preset + CSKH tự tạo)
+CREATE TABLE IF NOT EXISTS deki_follow_tags (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===== CÔNG VIỆC: Bàn giao =====
+CREATE TABLE IF NOT EXISTS deki_handover_tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ngay_thang DATE,
+    task VARCHAR(64),                 -- Giao hàng / Xử lý issue / Hàng stock
+    cong_viec TEXT,
+    tinh_trang VARCHAR(16) DEFAULT 'pending',  -- pending / done
+    nguoi_lam VARCHAR(16),            -- cskh / sale
+    ghi_chu TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ngay (ngay_thang),
+    INDEX idx_task (task),
+    INDEX idx_tinh_trang (tinh_trang),
+    INDEX idx_nguoi_lam (nguoi_lam)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

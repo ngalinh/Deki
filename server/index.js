@@ -521,6 +521,203 @@ app.post('/api/partner/segments-by-phones', requireApiKey(), async (req, res) =>
     }
 });
 
+// ===== CÔNG VIỆC: Follow khách =====
+
+// GET /api/follow - list follow customers (kèm tags, history, cờ "đã mua hàng")
+app.get('/api/follow', requireAuth(), async (req, res) => {
+    try {
+        const rows = await db.query(`SELECT * FROM deki_follow_customers ORDER BY ngay_lien_he DESC, id DESC`);
+        const histories = await db.query(`SELECT follow_id, tinh_trang, DATE_FORMAT(ngay_lien_he, '%Y-%m-%d') AS ngay_lien_he, created_at
+                                          FROM deki_follow_history ORDER BY created_at DESC`);
+        const histByFollow = new Map();
+        for (const h of histories) {
+            const arr = histByFollow.get(h.follow_id) || [];
+            arr.push({ tinh_trang: h.tinh_trang, ngay_lien_he: h.ngay_lien_he, created_at: h.created_at });
+            histByFollow.set(h.follow_id, arr);
+        }
+
+        // Map SĐT (9 số cuối) → có trong đơn hàng?
+        const boughtCores = new Set(
+            (await db.query(`SELECT RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) AS core FROM deki_customers WHERE phone <> ''`))
+                .map(r => r.core).filter(c => c && c.length >= 8)
+        );
+
+        const data = rows.map(r => {
+            const core = String(r.phone || '').replace(/\D/g, '').slice(-9);
+            const bought = core.length >= 8 && boughtCores.has(core);
+            let tags = [];
+            try { tags = r.tags ? JSON.parse(r.tags) : []; } catch { tags = []; }
+            return {
+                id: r.id, name: r.name, phone: r.phone || '', nhom_khach: r.nhom_khach || '',
+                fb_link: r.fb_link || '', nguon_khach: r.nguon_khach || '', nganh_hang: r.nganh_hang || '',
+                nhu_cau_website: r.nhu_cau_website || '', nhu_cau_sp: r.nhu_cau_sp || '',
+                tinh_trang: bought ? 'Đã mua hàng' : (r.tinh_trang || ''),
+                bought,
+                ngay_lien_he: r.ngay_lien_he ? new Date(r.ngay_lien_he).toISOString().slice(0, 10) : '',
+                tags, ghi_chu: r.ghi_chu || '',
+                history: histByFollow.get(r.id) || []
+            };
+        });
+        res.json({ success: true, data });
+    } catch (e) {
+        console.error('[api/follow] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/follow - thêm khách follow
+app.post('/api/follow', requireAuth(), async (req, res) => {
+    try {
+        const b = req.body || {};
+        if (!b.name) return res.status(400).json({ success: false, error: 'Thiếu tên khách hàng' });
+        const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
+        const result = await db.query(
+            `INSERT INTO deki_follow_customers
+             (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
+             b.nganh_hang || null, b.nhu_cau_website || null, b.nhu_cau_sp || null,
+             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null]
+        );
+        // Ghi history nếu có tình trạng / ngày liên hệ
+        if (b.tinh_trang || b.ngay_lien_he) {
+            await db.query(`INSERT INTO deki_follow_history (follow_id, tinh_trang, ngay_lien_he) VALUES (?,?,?)`,
+                [result.insertId, b.tinh_trang || null, b.ngay_lien_he || null]);
+        }
+        res.json({ success: true, id: result.insertId });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// PUT /api/follow/:id - cập nhật
+app.put('/api/follow/:id', requireAuth(), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const b = req.body || {};
+        // Lấy bản ghi cũ để biết tình trạng/ngày có đổi không
+        const old = await db.query(`SELECT tinh_trang, DATE_FORMAT(ngay_lien_he,'%Y-%m-%d') AS ngay_lien_he FROM deki_follow_customers WHERE id = ?`, [id]);
+        if (old.length === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy' });
+        const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
+        await db.query(
+            `UPDATE deki_follow_customers SET
+             name=?, phone=?, nhom_khach=?, fb_link=?, nguon_khach=?, nganh_hang=?,
+             nhu_cau_website=?, nhu_cau_sp=?, tinh_trang=?, ngay_lien_he=?, tags=?, ghi_chu=?
+             WHERE id=?`,
+            [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
+             b.nganh_hang || null, b.nhu_cau_website || null, b.nhu_cau_sp || null,
+             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, id]
+        );
+        // Ghi history nếu tình trạng HOẶC ngày liên hệ thay đổi
+        const changed = (b.tinh_trang || '') !== (old[0].tinh_trang || '') ||
+                        (b.ngay_lien_he || '') !== (old[0].ngay_lien_he || '');
+        if (changed && (b.tinh_trang || b.ngay_lien_he)) {
+            await db.query(`INSERT INTO deki_follow_history (follow_id, tinh_trang, ngay_lien_he) VALUES (?,?,?)`,
+                [id, b.tinh_trang || null, b.ngay_lien_he || null]);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/follow/:id
+app.delete('/api/follow/:id', requireAuth(), async (req, res) => {
+    try {
+        await db.query(`DELETE FROM deki_follow_customers WHERE id = ?`, [Number(req.params.id)]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/follow-tags - danh sách tag
+app.get('/api/follow-tags', requireAuth(), async (req, res) => {
+    try {
+        const rows = await db.query(`SELECT name FROM deki_follow_tags ORDER BY name`);
+        res.json({ success: true, data: rows.map(r => r.name) });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/follow-tags - tạo tag mới
+app.post('/api/follow-tags', requireAuth(), async (req, res) => {
+    try {
+        const name = String(req.body?.name || '').trim();
+        if (!name) return res.status(400).json({ success: false, error: 'Thiếu tên tag' });
+        await db.query(`INSERT IGNORE INTO deki_follow_tags (name) VALUES (?)`, [name]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ===== CÔNG VIỆC: Bàn giao =====
+
+// GET /api/handover - list (filters: from, to, task, tinh_trang, nguoi_lam)
+app.get('/api/handover', requireAuth(), async (req, res) => {
+    try {
+        const where = [], params = [];
+        if (req.query.from) { where.push('ngay_thang >= ?'); params.push(req.query.from); }
+        if (req.query.to) { where.push('ngay_thang <= ?'); params.push(req.query.to); }
+        if (req.query.task) { where.push('task = ?'); params.push(req.query.task); }
+        if (req.query.tinh_trang) { where.push('tinh_trang = ?'); params.push(req.query.tinh_trang); }
+        if (req.query.nguoi_lam) { where.push('nguoi_lam = ?'); params.push(req.query.nguoi_lam); }
+        const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+        const rows = await db.query(
+            `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu
+             FROM deki_handover_tasks ${whereSql} ORDER BY ngay_thang DESC, id DESC`,
+            params
+        );
+        res.json({ success: true, data: rows });
+    } catch (e) {
+        console.error('[api/handover] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/handover
+app.post('/api/handover', requireAuth(), async (req, res) => {
+    try {
+        const b = req.body || {};
+        const result = await db.query(
+            `INSERT INTO deki_handover_tasks (ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu)
+             VALUES (?,?,?,?,?,?)`,
+            [b.ngay_thang || null, b.task || null, b.cong_viec || null,
+             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null]
+        );
+        res.json({ success: true, id: result.insertId });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// PUT /api/handover/:id
+app.put('/api/handover/:id', requireAuth(), async (req, res) => {
+    try {
+        const b = req.body || {};
+        await db.query(
+            `UPDATE deki_handover_tasks SET ngay_thang=?, task=?, cong_viec=?, tinh_trang=?, nguoi_lam=?, ghi_chu=? WHERE id=?`,
+            [b.ngay_thang || null, b.task || null, b.cong_viec || null,
+             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null, Number(req.params.id)]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// DELETE /api/handover/:id
+app.delete('/api/handover/:id', requireAuth(), async (req, res) => {
+    try {
+        await db.query(`DELETE FROM deki_handover_tasks WHERE id = ?`, [Number(req.params.id)]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // SPA fallback: gửi index.html cho mọi route không match (trừ /api)
 app.get(/^(?!\/api|\/health).*/, (req, res) => {
     res.sendFile(path.join(ROOT_DIR, 'index.html'));
