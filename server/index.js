@@ -7,7 +7,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 
 const db = require('./src/db');
-const { requireAuth, requireApiKey, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache, DEV_MODE, getDevUser } = require('./src/auth');
+const { requireAuth, requireApiKey, verifyBassoSession, isDekiAdmin, hasAccess, clearSessionCache, DEV_MODE, getDevUser, resolveDevUser } = require('./src/auth');
 const { runMigrations } = require('./src/migrate');
 
 const app = express();
@@ -42,7 +42,7 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 // ===== Auth: /api/me =====
 // Frontend tự gọi để check login + lấy roles + isDekiAdmin
 app.get('/api/me', async (req, res) => {
-    if (DEV_MODE) return res.json({ success: true, user: getDevUser() });
+    if (DEV_MODE) return res.json({ success: true, user: await resolveDevUser(req) });
     const cookie = req.headers.cookie || '';
     const user = await verifyBassoSession(cookie);
     if (!user) {
@@ -608,12 +608,64 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
     }
 });
 
+// ===== Basso: tra link đơn hàng theo mã (mã đơn → id nội bộ trang basso.vn) =====
+// Auth 2 lớp: X-Partner-Api-Key + Bearer token từ /partner/login (cache, tự re-login khi 401).
+const BASSO = {
+    url: (process.env.BASSO_API_URL || '').replace(/\/+$/, ''),
+    key: process.env.BASSO_API_KEY || '',
+    email: process.env.BASSO_EMAIL || '',
+    pass: process.env.BASSO_PASS || ''
+};
+let bassoToken = null;
+async function bassoLogin() {
+    const body = new URLSearchParams({ email: BASSO.email, pass: BASSO.pass }).toString();
+    const res = await fetch(`${BASSO.url}/partner/login`, {
+        method: 'POST',
+        headers: { 'X-Partner-Api-Key': BASSO.key, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body
+    });
+    const data = await res.json().catch(() => null);
+    const token = data?.data?.access_token;
+    if (!token) throw new Error('Basso login failed');
+    bassoToken = token;
+    return token;
+}
+
+// GET /api/orders/order-link?code=BSxxx → { url } để mở trang chi tiết đơn trên basso.vn
+app.get('/api/orders/order-link', requireAuth(), async (req, res) => {
+    const code = String(req.query.code || '').trim();
+    if (!code) return res.status(400).json({ success: false, error: 'Thiếu mã đơn' });
+    if (!BASSO.url || !BASSO.key || !BASSO.email || !BASSO.pass) {
+        return res.status(400).json({ success: false, error: 'Chưa cấu hình Basso API (BASSO_API_URL/KEY/EMAIL/PASS)' });
+    }
+    try {
+        const fetchOrder = (token) =>
+            fetch(`${BASSO.url}/partner/getOrderByCode?order_code=${encodeURIComponent(code)}`, {
+                headers: { 'X-Partner-Api-Key': BASSO.key, Authorization: `Bearer ${token}` }
+            });
+        let token = bassoToken || (await bassoLogin());
+        let r = await fetchOrder(token);
+        if (r.status === 401 || r.status === 403) { token = await bassoLogin(); r = await fetchOrder(token); }
+        const data = await r.json().catch(() => null);
+        const id = data?.data?.order?.id;
+        if (!id) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn trên Basso' });
+        res.json({ success: true, id, url: `${BASSO.url}/basso/customer_order/detail/${id}` });
+    } catch (e) {
+        console.error('[basso] order-link failed:', e.message);
+        res.status(500).json({ success: false, error: 'Tra cứu đơn thất bại' });
+    }
+});
+
 // ===== CÔNG VIỆC: Follow khách =====
 
 // GET /api/follow - list follow customers (kèm tags, history, cờ "đã mua hàng")
 app.get('/api/follow', requireAuth(), async (req, res) => {
     try {
-        const rows = await db.query(`SELECT * FROM deki_follow_customers ORDER BY ngay_lien_he DESC, id DESC`);
+        // Scope theo email: user chỉ thấy bản ghi mình tạo; admin thấy tất cả.
+        const isAdmin = !!req.user.isDekiAdmin;
+        const scopeSql = isAdmin ? '' : 'WHERE owner_email = ?';
+        const scopeParams = isAdmin ? [] : [req.user.email];
+        const rows = await db.query(`SELECT * FROM deki_follow_customers ${scopeSql} ORDER BY ngay_lien_he DESC, id DESC`, scopeParams);
         const histories = await db.query(`SELECT follow_id, tinh_trang, DATE_FORMAT(ngay_lien_he, '%Y-%m-%d') AS ngay_lien_he, created_at
                                           FROM deki_follow_history ORDER BY created_at DESC`);
         const histByFollow = new Map();
@@ -650,6 +702,7 @@ app.get('/api/follow', requireAuth(), async (req, res) => {
                 bought,
                 ngay_lien_he: r.ngay_lien_he ? new Date(r.ngay_lien_he).toISOString().slice(0, 10) : '',
                 tags, ghi_chu: r.ghi_chu || '',
+                owner_email: r.owner_email || '',
                 history: histByFollow.get(r.id) || []
             };
         });
@@ -669,11 +722,11 @@ app.post('/api/follow', requireAuth(), async (req, res) => {
         const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
         const result = await db.query(
             `INSERT INTO deki_follow_customers
-             (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+             (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu, owner_email)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
              b.nganh_hang || null, websites, b.nhu_cau_sp || null,
-             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null]
+             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, req.user.email]
         );
         // Ghi history nếu có tình trạng / ngày liên hệ
         if (b.tinh_trang || b.ngay_lien_he) {
@@ -692,8 +745,12 @@ app.put('/api/follow/:id', requireAuth(), async (req, res) => {
         const id = Number(req.params.id);
         const b = req.body || {};
         // Lấy bản ghi cũ để biết tình trạng/ngày có đổi không
-        const old = await db.query(`SELECT tinh_trang, DATE_FORMAT(ngay_lien_he,'%Y-%m-%d') AS ngay_lien_he FROM deki_follow_customers WHERE id = ?`, [id]);
+        const old = await db.query(`SELECT tinh_trang, owner_email, DATE_FORMAT(ngay_lien_he,'%Y-%m-%d') AS ngay_lien_he FROM deki_follow_customers WHERE id = ?`, [id]);
         if (old.length === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy' });
+        // User thường chỉ được sửa bản ghi mình tạo
+        if (!req.user.isDekiAdmin && old[0].owner_email && old[0].owner_email !== req.user.email) {
+            return res.status(403).json({ success: false, error: 'Không có quyền sửa bản ghi này' });
+        }
         const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
         const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
         await db.query(
@@ -721,7 +778,12 @@ app.put('/api/follow/:id', requireAuth(), async (req, res) => {
 // DELETE /api/follow/:id
 app.delete('/api/follow/:id', requireAuth(), async (req, res) => {
     try {
-        await db.query(`DELETE FROM deki_follow_customers WHERE id = ?`, [Number(req.params.id)]);
+        const id = Number(req.params.id);
+        if (req.user.isDekiAdmin) {
+            await db.query(`DELETE FROM deki_follow_customers WHERE id = ?`, [id]);
+        } else {
+            await db.query(`DELETE FROM deki_follow_customers WHERE id = ? AND owner_email = ?`, [id, req.user.email]);
+        }
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
@@ -761,9 +823,11 @@ app.get('/api/handover', requireAuth(), async (req, res) => {
         if (req.query.task) { where.push('task = ?'); params.push(req.query.task); }
         if (req.query.tinh_trang) { where.push('tinh_trang = ?'); params.push(req.query.tinh_trang); }
         if (req.query.nguoi_lam) { where.push('nguoi_lam = ?'); params.push(req.query.nguoi_lam); }
+        // Scope theo email: user chỉ thấy việc mình tạo; admin thấy tất cả.
+        if (!req.user.isDekiAdmin) { where.push('owner_email = ?'); params.push(req.user.email); }
         const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
         const rows = await db.query(
-            `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu
+            `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu, owner_email
              FROM deki_handover_tasks ${whereSql} ORDER BY ngay_thang DESC, id DESC`,
             params
         );
@@ -779,10 +843,10 @@ app.post('/api/handover', requireAuth(), async (req, res) => {
     try {
         const b = req.body || {};
         const result = await db.query(
-            `INSERT INTO deki_handover_tasks (ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu)
-             VALUES (?,?,?,?,?,?)`,
+            `INSERT INTO deki_handover_tasks (ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu, owner_email)
+             VALUES (?,?,?,?,?,?,?)`,
             [b.ngay_thang || null, b.task || null, b.cong_viec || null,
-             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null]
+             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null, req.user.email]
         );
         res.json({ success: true, id: result.insertId });
     } catch (e) {
@@ -794,10 +858,13 @@ app.post('/api/handover', requireAuth(), async (req, res) => {
 app.put('/api/handover/:id', requireAuth(), async (req, res) => {
     try {
         const b = req.body || {};
+        const id = Number(req.params.id);
+        const ownerCond = req.user.isDekiAdmin ? '' : ' AND owner_email = ?';
+        const extraParams = req.user.isDekiAdmin ? [] : [req.user.email];
         await db.query(
-            `UPDATE deki_handover_tasks SET ngay_thang=?, task=?, cong_viec=?, tinh_trang=?, nguoi_lam=?, ghi_chu=? WHERE id=?`,
+            `UPDATE deki_handover_tasks SET ngay_thang=?, task=?, cong_viec=?, tinh_trang=?, nguoi_lam=?, ghi_chu=? WHERE id=?${ownerCond}`,
             [b.ngay_thang || null, b.task || null, b.cong_viec || null,
-             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null, Number(req.params.id)]
+             b.tinh_trang || 'pending', b.nguoi_lam || null, b.ghi_chu || null, id, ...extraParams]
         );
         res.json({ success: true });
     } catch (e) {
@@ -808,7 +875,12 @@ app.put('/api/handover/:id', requireAuth(), async (req, res) => {
 // DELETE /api/handover/:id
 app.delete('/api/handover/:id', requireAuth(), async (req, res) => {
     try {
-        await db.query(`DELETE FROM deki_handover_tasks WHERE id = ?`, [Number(req.params.id)]);
+        const id = Number(req.params.id);
+        if (req.user.isDekiAdmin) {
+            await db.query(`DELETE FROM deki_handover_tasks WHERE id = ?`, [id]);
+        } else {
+            await db.query(`DELETE FROM deki_handover_tasks WHERE id = ? AND owner_email = ?`, [id, req.user.email]);
+        }
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });

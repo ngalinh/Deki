@@ -10,6 +10,32 @@ const SUPER_ADMIN_EMAIL = (process.env.DEKI_SUPER_ADMIN || '').toLowerCase().tri
 // Khi bật → mọi request coi như super admin (dev@local). TUYỆT ĐỐI không bật trên production.
 const DEV_MODE = process.env.DEKI_DEV_MODE === '1';
 const DEV_USER = { email: SUPER_ADMIN_EMAIL || 'dev@local', name: 'Dev (local)', staffNames: [], roles: ['admin'], isDekiAdmin: true };
+// DEV impersonation: đặt DEKI_DEV_AS=email@basso.vn để đóng giả 1 tài khoản đã phân quyền
+// (lấy vai trò/staffNames thật từ deki_permissions). Có thể override theo request bằng
+// header X-Dev-As hoặc query ?devAs=email. Trống → super admin dev@local như cũ.
+const DEV_AS = (process.env.DEKI_DEV_AS || '').toLowerCase().trim();
+
+// Dựng user dev theo email đóng giả (tra permissions). Dùng cho cả /api/me và requireAuth.
+async function resolveDevUser(req) {
+    const override = ((req && (req.headers?.['x-dev-as'] || req.query?.devAs)) || DEV_AS || '')
+        .toString().toLowerCase().trim();
+    if (!override || override === (SUPER_ADMIN_EMAIL || 'dev@local')) return { ...DEV_USER };
+    let name = override, staffNames = [], isAdmin = false, found = false;
+    try {
+        const rows = await db.query('SELECT name, staff_name, is_admin FROM deki_permissions WHERE email = ?', [override]);
+        if (rows.length > 0) {
+            found = true;
+            name = rows[0].name || override;
+            isAdmin = rows[0].is_admin === 1;
+            const raw = rows[0].staff_name;
+            if (raw) {
+                try { const p = JSON.parse(raw); staffNames = Array.isArray(p) ? p : [String(raw)]; }
+                catch { staffNames = [String(raw)]; }
+            }
+        }
+    } catch {}
+    return { email: override, name, staffNames, roles: isAdmin ? ['admin'] : ['user'], isDekiAdmin: isAdmin, devNotFound: !found };
+}
 
 const sessionCache = new Map();
 
@@ -94,7 +120,7 @@ async function isDekiAdmin(email) {
 
 function requireAuth() {
     return async (req, res, next) => {
-        if (DEV_MODE) { req.user = { ...DEV_USER }; return next(); }
+        if (DEV_MODE) { req.user = await resolveDevUser(req); return next(); }
         const cookie = req.headers.cookie || '';
         const user = await verifyBassoSession(cookie);
         if (!user) {
@@ -141,5 +167,5 @@ function requireApiKey() {
 
 module.exports = {
     verifyBassoSession, requireAuth, requireApiKey, hasAccess, isDekiAdmin, clearSessionCache,
-    DEV_MODE, getDevUser: () => ({ ...DEV_USER })
+    DEV_MODE, getDevUser: () => ({ ...DEV_USER }), resolveDevUser
 };

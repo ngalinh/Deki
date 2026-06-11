@@ -134,6 +134,24 @@ async function runMigrations() {
             console.error('[migrate] nhu_cau_website migration error:', e.message);
         }
 
+        // Migration: thêm owner_email (email tài khoản tạo) cho Follow khách + Bàn giao
+        // → mỗi user chỉ thấy bản ghi mình tạo, admin thấy tất cả.
+        try {
+            for (const tbl of ['deki_follow_customers', 'deki_handover_tasks']) {
+                const cols = (await db.query(
+                    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`, [tbl]
+                )).map(r => r.COLUMN_NAME);
+                if (!cols.includes('owner_email')) {
+                    await pool.query(`ALTER TABLE ${tbl} ADD COLUMN owner_email VARCHAR(255) DEFAULT NULL`);
+                    await pool.query(`ALTER TABLE ${tbl} ADD INDEX idx_owner_email (owner_email)`).catch(() => {});
+                    console.log(`[migrate] Đã thêm cột owner_email vào ${tbl}`);
+                }
+            }
+        } catch (e) {
+            console.error('[migrate] owner_email migration error:', e.message);
+        }
+
         // Seed preset tags cho Follow khách
         try {
             for (const tag of ['Tiềm năng', 'Khách VIP']) {

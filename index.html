@@ -361,6 +361,17 @@
             white-space: nowrap;
         }
 
+        /* Bảng danh sách khách: cố định bề rộng cột tên để không bị dịch giữa các trang.
+           Mỗi tên nằm trong span rộng cố định → cột luôn cùng bề rộng, không ảnh hưởng cột khác. */
+        table.cust-fixed td:first-child .clamp-name {
+            display: inline-block;
+            width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -943,6 +954,12 @@
                         <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">📅 Đến ngày</label>
                         <input type="date" id="dashTo" class="filter-select">
                     </div>
+                    <div id="dashEmployeeWrap" class="section-hidden">
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: var(--text-gray); margin-bottom: 6px;">Nhân viên</label>
+                        <select class="filter-select" id="dashEmployee" onchange="applyDashboardFilter()" style="min-width: 160px;">
+                            <option value="">Tất cả nhân viên</option>
+                        </select>
+                    </div>
                     <button class="btn btn-primary" onclick="applyDashboardFilter()">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -1068,8 +1085,8 @@
                 <button class="view-btn" id="custTabSi" onclick="switchCustTab('si')">Khách sỉ</button>
             </div>
 
-            <!-- ===== TAB: Tất cả ===== -->
-            <div id="cust-all">
+            <!-- ===== TAB: Tất cả (ẩn — nay dùng chung view segment bên dưới) ===== -->
+            <div id="cust-all" class="section-hidden">
                 <div class="filters">
                     <div class="filters-row">
                         <select class="filter-select" id="allTimeFilter" onchange="onAllTimeChange()">
@@ -1110,7 +1127,7 @@
                 </div>
 
                 <div class="table-container">
-                    <table>
+                    <table class="cust-fixed">
                         <thead>
                             <tr>
                                 <th>Khách hàng</th>
@@ -1132,8 +1149,8 @@
                 </div>
             </div>
 
-            <!-- ===== TAB: Khách lẻ / CTV / Sỉ (dùng chung) ===== -->
-            <div id="cust-segment" class="section-hidden">
+            <!-- ===== TAB: Tất cả / Khách lẻ / CTV / Sỉ (dùng chung) ===== -->
+            <div id="cust-segment">
                 <div class="filters">
                     <div class="filters-row">
                         <select class="filter-select" id="segTimeFilter" onchange="onSegTimeChange()" title="Lọc đơn theo thời gian">
@@ -1180,7 +1197,7 @@
                 </div>
 
                 <div class="table-container">
-                    <table>
+                    <table class="cust-fixed">
                         <thead>
                             <tr id="segTableHead"></tr>
                         </thead>
@@ -1256,11 +1273,6 @@
                             <th>Phân nhóm</th>
                             <th>Nhân viên</th>
                             <th>Website</th>
-                            <th>Tỷ giá</th>
-                            <th>Ship QT</th>
-                            <th>Phụ thu</th>
-                            <th>Giảm giá</th>
-                            <th>Lý do giảm</th>
                             <th>Thành tiền</th>
                         </tr>
                     </thead>
@@ -1540,8 +1552,17 @@
 
             <!-- ===== Follow khách ===== -->
             <div id="cv-follow">
-                <div class="filters" style="margin-bottom: 16px;">
-                    <div class="search-box" style="max-width: 360px;">
+                <div class="filters" style="margin-bottom: 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                    <select class="filter-select section-hidden" id="followOwnerFilter" onchange="renderFollowTable()" style="min-width:180px;">
+                        <option value="">Tất cả tài khoản</option>
+                    </select>
+                    <select class="filter-select" id="followWebFilter" onchange="renderFollowTable()" style="min-width:170px;">
+                        <option value="">Tất cả website</option>
+                    </select>
+                    <select class="filter-select" id="followSpFilter" onchange="renderFollowTable()" style="min-width:170px;">
+                        <option value="">Tất cả nhu cầu SP</option>
+                    </select>
+                    <div class="search-box" style="max-width: 360px; min-width:240px; margin-left:auto;">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
                         </svg>
@@ -1606,6 +1627,12 @@
                                 <option value="">Tất cả</option>
                                 <option value="CSKH">CSKH</option>
                                 <option value="SALE">SALE</option>
+                            </select>
+                        </div>
+                        <div id="hoOwnerWrap" class="section-hidden">
+                            <label style="display:block; font-size:13px; color:var(--text-gray); margin-bottom:6px;">Tài khoản</label>
+                            <select id="hoOwnerFilter" class="filter-select" onchange="renderHandoverTable()" style="min-width:180px;">
+                                <option value="">Tất cả tài khoản</option>
                             </select>
                         </div>
                         <button class="btn btn-primary" style="align-self: end;" onclick="loadHandover()">Lọc</button>
@@ -2037,6 +2064,7 @@
         // Refresh CẢ 3 chart (doanh thu + phân nhóm + top website) theo dashboardRange
         function refreshDashboardCharts() {
             const range = dashboardRange;
+            const empSet = dashEmpStaffSet;
             const inRange = (ymd) => !range || (ymd >= range.from && ymd <= range.to);
 
             // ===== Revenue line chart =====
@@ -2047,13 +2075,14 @@
                 revenueChart.update();
             }
 
-            // ===== Segment (phân nhóm) + Top website — gom từ orders trong range =====
+            // ===== Segment (phân nhóm) + Top website — gom từ orders trong range (+ filter nhân viên) =====
             const segs = {};            // segment → { customers:Set, revenue }
             const webCount = {}, webRev = {};
             allCustomers.forEach(c => {
                 const seg = c.segment || 'N/A';
                 let custHasOrder = false;
                 (c.allOrders || []).forEach(o => {
+                    if (empSet && !empSet.has(o.employee)) return;
                     const ymd = parseDateToDay(o.date);
                     if (ymd && !inRange(ymd)) return;
                     custHasOrder = true;
@@ -2097,8 +2126,10 @@
 
         // Build series doanh thu theo range. Tự chọn granularity: ≤62 ngày → theo ngày, dài hơn → theo tháng.
         function buildRevenueSeries(range) {
+            const empSet = dashEmpStaffSet;
             const dailyTotal = {}; // ymd → revenue
             allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                if (empSet && !empSet.has(o.employee)) return;
                 const ymd = parseDateToDay(o.date);
                 if (!ymd) return;
                 if (range && (ymd < range.from || ymd > range.to)) return;
@@ -2356,6 +2387,19 @@
             return i > 0 ? s.slice(0, i) : s;
         }
 
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        // Cắt tên hiển thị tối đa max ký tự, thêm … nếu dài hơn (title = tên đầy đủ).
+        // Luôn bọc trong span.clamp-name để bảng khách (.cust-fixed) cố định bề rộng cột.
+        function clampName(s, max = 30) {
+            s = s == null ? '' : String(s);
+            const truncated = s.length > max;
+            const text = truncated ? s.slice(0, max) + '…' : s;
+            return `<span class="clamp-name"${truncated ? ` title="${escapeHtml(s)}"` : ''}>${escapeHtml(text)}</span>`;
+        }
+
         // ===== API CLIENT =====
         // Tự detect base path để hoạt động cả khi app serve dưới subpath (vd: /b/xxx/)
         const API_BASE = (() => {
@@ -2372,8 +2416,23 @@
             return API_BASE + clean;
         }
 
+        // DEV: đóng giả tài khoản qua ?devAs=email trên URL (chỉ tác dụng khi server bật DEV_MODE).
+        // Lưu sessionStorage để giữ qua thao tác. Truy cập '?devAs=' (trống) để về super admin.
+        const _devAs = (() => {
+            try {
+                const q = new URL(window.location.href).searchParams.get('devAs');
+                if (q !== null) sessionStorage.setItem('devAs', q);
+                return sessionStorage.getItem('devAs') || '';
+            } catch { return ''; }
+        })();
+        function devHeaders(base) {
+            const h = base ? { ...base } : {};
+            if (_devAs) h['X-Dev-As'] = _devAs;
+            return h;
+        }
+
         async function apiGet(path) {
-            const res = await fetch(apiUrl(path), { credentials: 'include' });
+            const res = await fetch(apiUrl(path), { credentials: 'include', headers: devHeaders() });
             if (res.status === 401) throw { code: 'NOT_LOGGED_IN', status: 401 };
             if (res.status === 403) {
                 const body = await res.json().catch(() => ({}));
@@ -2384,7 +2443,7 @@
         }
 
         async function apiDelete(path) {
-            const res = await fetch(apiUrl(path), { method: 'DELETE', credentials: 'include' });
+            const res = await fetch(apiUrl(path), { method: 'DELETE', credentials: 'include', headers: devHeaders() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
         }
@@ -2393,7 +2452,7 @@
             const form = new FormData();
             form.append('file', file);
             const res = await fetch(apiUrl(path), {
-                method: 'POST', body: form, credentials: 'include'
+                method: 'POST', body: form, credentials: 'include', headers: devHeaders()
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -2438,7 +2497,9 @@
             repopulateWebsiteFilter();
             repopulateEmployeeFilter();
             populateAdvancedFilterDropdowns();
-            applyFilters();
+            populateDashEmployee();
+            buildSegWebsiteDropdown();
+            renderSegmentTable();   // view khách hiện tại (mọi tab dùng chung)
             renderDashboardStats();
             refreshDashboardCharts();
             renderReports();
@@ -2540,7 +2601,7 @@
 
                 return `
                     <tr onclick="showCustomerDetail('${customer.id}')">
-                        <td class="customer-name">${customer.name}</td>
+                        <td class="customer-name">${clampName(customer.name)}</td>
                         <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
                         <td style="font-weight:600;">${customer.revenue.toLocaleString('vi-VN')} đ</td>
                         <td>${customer.orders}</td>
@@ -2709,7 +2770,7 @@
 
                 return `
                     <tr onclick="showCustomerDetail('${c.id}')" style="cursor: pointer;">
-                        <td class="customer-name">${c.name}</td>
+                        <td class="customer-name">${clampName(c.name)}</td>
                         <td style="color: var(--text-gray);">${c.phone || '-'}</td>
                         <td><span class="badge ${segmentClass}">${c.segment || '-'}</span></td>
                         <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
@@ -2895,20 +2956,16 @@
                 const btn = document.getElementById('custTab' + (t === 'all' ? 'All' : t === 'le' ? 'Le' : t === 'ctv' ? 'Ctv' : 'Si'));
                 if (btn) btn.classList.toggle('active', t === tab);
             });
-            document.getElementById('cust-all').classList.toggle('section-hidden', tab !== 'all');
-            document.getElementById('cust-segment').classList.toggle('section-hidden', tab === 'all');
-            if (tab === 'all') {
-                // Cập nhật lại header count theo list "Tất cả"
-                updateCustomerCount();
-            } else {
-                segSelectedWebsites = [];
-                segSort = { col: null, dir: null };
-                segCurrentPage = 1;
-                buildSegWebsiteDropdown();
-                document.getElementById('segWebsiteCount').textContent = 'tất cả';
-                document.getElementById('segSearch').value = '';
-                renderSegmentTable();
-            }
+            // Tất cả 4 tab dùng chung view segment (cùng cột + sort + filter)
+            document.getElementById('cust-all').classList.add('section-hidden');
+            document.getElementById('cust-segment').classList.remove('section-hidden');
+            segSelectedWebsites = [];
+            segSort = { col: null, dir: null };
+            segCurrentPage = 1;
+            buildSegWebsiteDropdown();
+            document.getElementById('segWebsiteCount').textContent = 'tất cả';
+            const ss = document.getElementById('segSearch'); if (ss) ss.value = '';
+            renderSegmentTable();
         }
 
         function goToSegPage(page) {
@@ -2935,10 +2992,10 @@
 
         // Website multi-select dropdown
         function buildSegWebsiteDropdown() {
-            const segs = SEGMENT_MAP[custTab] || [];
+            const segs = SEGMENT_MAP[custTab] || null;   // null = tất cả phân nhóm
             const websites = new Set();
             allCustomers.forEach(c => {
-                if (!segs.includes(c.segment)) return;
+                if (segs && !segs.includes(c.segment)) return;
                 (c.websites || []).forEach(w => { if (w && w !== 'N/A') websites.add(w); });
             });
             const list = Array.from(websites).sort();
@@ -3031,10 +3088,11 @@
         }
 
         function renderSegmentTable(keepPage) {
-            if (custTab === 'all') return;
             if (!keepPage) segCurrentPage = 1;   // filter/search/sort đổi → về trang 1
-            const segs = SEGMENT_MAP[custTab] || [];
+            const segs = SEGMENT_MAP[custTab] || null;   // null = tất cả phân nhóm (tab "Tất cả")
             const isSi = custTab === 'si';
+            const isAll = custTab === 'all';
+            const showSeg = isSi || isAll;   // cột Phân nhóm/Loại khách
             const timeRange = resolveTimeRange('segTimeFilter', 'segCustFrom', 'segCustTo');
             const lastRange = resolveTimeRange('segLastOrderFilter', 'segLastFrom', 'segLastTo');
             const q = removeDiacritics((document.getElementById('segSearch').value || '').trim()).toLowerCase();
@@ -3043,7 +3101,7 @@
             // Tính metrics theo filter cho từng khách thuộc segment
             const rows = [];
             allCustomers.forEach(c => {
-                if (!segs.includes(c.segment)) return;
+                if (segs && !segs.includes(c.segment)) return;
                 if (q && !removeDiacritics(c.name).toLowerCase().includes(q) && !(c.phone || '').includes(q)) return;
 
                 let orders = 0, revenue = 0, lastOrder = '';
@@ -3098,19 +3156,18 @@
             };
             document.getElementById('segTableHead').innerHTML = `
                 <th>Khách hàng</th>
-                ${isSi ? '<th>Loại khách</th>' : ''}
+                ${showSeg ? `<th>${isAll ? 'Phân nhóm' : 'Loại khách'}</th>` : ''}
                 <th>Websites</th>
                 <th>SL đơn hàng${sortIcon('orders')}</th>
                 <th>Tổng doanh thu${sortIcon('revenue')}</th>
                 <th>Doanh thu TB${sortIcon('avg')}</th>
-                <th>Đơn gần nhất${sortIcon('last')}</th>
-                <th>Ghi chú</th>`;
+                <th>Đơn gần nhất${sortIcon('last')}</th>`;
 
             // Cập nhật header count theo list đang hiển thị
             setCustHeaderCount(rows.length);
 
             const tbody = document.getElementById('segTableBody');
-            const colspan = isSi ? 8 : 7;
+            const colspan = showSeg ? 7 : 6;
             if (rows.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding:40px; color:var(--text-light);">Không có khách hàng phù hợp</td></tr>`;
                 document.getElementById('segCount').textContent = '';
@@ -3129,17 +3186,16 @@
                     ? `<span style="font-weight:500;">${r.websites.length} web</span>
                        <div style="font-size:11px; color:var(--text-light); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.websites.map(webName).join(', ')}">${r.websites.map(webName).join(', ')}</div>`
                     : '-';
-                const segBadge = isSi ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
+                const segBadge = showSeg ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
                 return `
                     <tr onclick="showCustomerDetail('${r.id}')" style="cursor:pointer;">
-                        <td class="customer-name">${r.name}</td>
+                        <td class="customer-name">${clampName(r.name)}</td>
                         ${segBadge}
                         <td>${webChips}</td>
                         <td>${r.orders.toLocaleString('vi-VN')}</td>
                         <td style="font-weight:600;">${r.revenue.toLocaleString('vi-VN')} đ</td>
                         <td>${Math.round(r.avg).toLocaleString('vi-VN')} đ</td>
                         <td style="color:var(--text-gray);">${r.lastOrder ? fmtDateVN(r.lastOrder) : '-'}</td>
-                        <td style="color:var(--text-light);">-</td>
                     </tr>`;
             }).join('');
 
@@ -3169,6 +3225,25 @@
         // ===== ĐƠN HÀNG =====
         let ordPage = 1;
         let ordEmployeesLoaded = false;
+
+        // Bấm mã đơn → tra id nội bộ qua Basso Partner API → mở trang chi tiết đơn trên basso.vn
+        let bassoOpening = false;
+        async function openBassoOrder(code, ev) {
+            if (ev) ev.preventDefault();
+            if (bassoOpening) return;
+            bassoOpening = true;
+            try {
+                const res = await fetch(apiUrl('/api/orders/order-link?code=' + encodeURIComponent(code)),
+                    { credentials: 'include', headers: devHeaders() });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.url) throw new Error(data.error || `HTTP ${res.status}`);
+                window.open(data.url, '_blank', 'noopener');
+            } catch (e) {
+                showToast('error', 'Không mở được đơn', e.message);
+            } finally {
+                bassoOpening = false;
+            }
+        }
 
         function initOrdersView() {
             if (!ordEmployeesLoaded) {
@@ -3218,7 +3293,7 @@
             const rows = r.data || [];
             document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('vi-VN') + ' đơn hàng';
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
                 document.getElementById('ordPaginationInfo').textContent = '';
                 document.getElementById('ordPaginationControls').innerHTML = '';
                 return;
@@ -3227,18 +3302,13 @@
             tbody.innerHTML = rows.map(o => `
                 <tr>
                     <td style="color:var(--text-gray); white-space:nowrap;">${o.date || '-'}</td>
-                    <td class="order-code">${o.code || '-'}</td>
-                    <td class="customer-name">${o.customer || '-'}</td>
+                    <td class="order-code">${o.code ? `<a href="#" onclick="openBassoOrder('${String(o.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${o.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${o.code}</a>` : '-'}</td>
+                    <td class="customer-name">${o.customer ? clampName(o.customer) : '-'}</td>
                     <td style="color:var(--text-gray);">${o.phone || '-'}</td>
                     <td style="color:var(--text-gray);">${o.brand || '-'}</td>
                     <td>${o.segment ? `<span class="badge ${removeDiacritics(o.segment).toLowerCase().replace(/\s+/g,'-')}">${o.segment}</span>` : '-'}</td>
                     <td style="color:var(--text-gray);">${o.employee || '-'}</td>
                     <td style="color:var(--text-gray);">${o.website ? webName(o.website) : '-'}</td>
-                    <td style="color:var(--text-gray);">${num(o.ty_gia)}</td>
-                    <td style="color:var(--text-gray);">${num(o.ship_quoc_te)}</td>
-                    <td style="color:var(--text-gray);">${num(o.phu_thu)}</td>
-                    <td style="color:var(--text-gray);">${num(o.giam_gia)}</td>
-                    <td style="color:var(--text-gray); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(o.ly_do_giam_gia||'').replace(/"/g,'&quot;')}">${o.ly_do_giam_gia || '-'}</td>
                     <td style="font-weight:600; white-space:nowrap;">${(o.amount || 0).toLocaleString('vi-VN')} đ</td>
                 </tr>`).join('');
 
@@ -3452,6 +3522,9 @@
 
         // ===== DASHBOARD DATE FILTER =====
         let dashboardRange = null; // {from, to} hoặc null = toàn thời gian
+        let dashEmployeeFilter = ''; // tên hiển thị đang chọn ('' = tất cả; chỉ admin)
+        let dashEmpStaffSet = null;  // Set tên Excel ứng với tên hiển thị đang chọn (null = không lọc)
+        let dashNameToStaff = {};    // tên hiển thị → Set(tên Excel) lấy từ /api/permissions
 
         // Tìm ngày mới nhất có đơn trong data
         function getLatestDataDay() {
@@ -3523,49 +3596,74 @@
             } else {
                 dashboardRange = dashRangeFromPreset(period);
             }
+            dashEmployeeFilter = document.getElementById('dashEmployee')?.value || '';
+            dashEmpStaffSet = dashEmployeeFilter ? (dashNameToStaff[dashEmployeeFilter] || new Set()) : null;
             renderDashboardStats();
             refreshDashboardCharts();
         }
 
+        // Populate dropdown nhân viên ở Dashboard theo TÊN HIỂN THỊ (admin only).
+        // Mỗi tên hiển thị (cấu hình ở Quản lý quyền) ánh xạ tới nhiều tên Excel (staff_names).
+        async function populateDashEmployee() {
+            const sel = document.getElementById('dashEmployee');
+            if (!sel || !currentUser?.isDekiAdmin) return;
+            try {
+                const res = await apiGet('/api/permissions');
+                const perms = res.data || [];
+                dashNameToStaff = {};
+                perms.forEach(u => {
+                    const dn = (u.name || '').trim();
+                    if (!dn) return;
+                    if (!dashNameToStaff[dn]) dashNameToStaff[dn] = new Set();
+                    (u.staff_names || []).forEach(n => { if (n) dashNameToStaff[dn].add(n); });
+                });
+                const cur = sel.value;
+                const names = Object.keys(dashNameToStaff)
+                    .filter(dn => dashNameToStaff[dn].size > 0).sort();
+                sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
+                    names.map(dn => `<option value="${dn.replace(/"/g, '&quot;')}">${dn}</option>`).join('');
+                sel.value = cur;
+            } catch (e) { /* không nạp được thì giữ "Tất cả nhân viên" */ }
+        }
+
         // Tính dashboard stats. range = {from,to} (YYYY-MM-DD) lọc theo khoảng; null = toàn thời gian.
         function calculateDashboardStats(range) {
-            // Pre-compute firstOrderDate (toàn thời gian) cho mỗi khách → dùng tính "khách mới"
-            // và iterate orders 1 lần để gom theo range + theo tháng.
-            const monthlyTotals = {}; // cho trend month-over-month (chế độ không range)
-            let totalOrders = 0, totalRevenue = 0;
+            const empSet = dashEmpStaffSet;
+            const emp = !!empSet; // có đang lọc theo nhân viên không
+            const empPass = (o) => !empSet || empSet.has(o.employee);
+
+            const monthlyTotals = {};            // emp-filtered, theo tháng (trend + khách mới)
+            let totalOrders = 0, totalRevenue = 0;   // trong range
+            let grandOrders = 0, grandRevenue = 0;   // toàn thời gian (emp-filtered)
             const custInRange = new Set();
+            const custAll = new Set();
+            const firstMonthByCust = {};
             let newCustomers = 0;
 
             allCustomers.forEach(customer => {
-                // firstOrderDate toàn thời gian
-                let firstYmd = null;
-                let hasOrderInRange = false;
+                let firstYmd = null, hasOrderInRange = false, custHasAny = false;
                 (customer.allOrders || []).forEach(o => {
+                    if (!empPass(o)) return;
                     const ymd = parseDateToDay(o.date);
                     if (!ymd) return;
+                    custHasAny = true;
+                    grandOrders += 1; grandRevenue += (o.amount || 0);
                     if (!firstYmd || ymd < firstYmd) firstYmd = ymd;
 
                     const inRange = !range || (ymd >= range.from && ymd <= range.to);
-                    if (inRange) {
-                        hasOrderInRange = true;
-                        totalOrders += 1;
-                        totalRevenue += (o.amount || 0);
-                    }
-                });
+                    if (inRange) { hasOrderInRange = true; totalOrders += 1; totalRevenue += (o.amount || 0); }
 
+                    const ym = ymd.slice(0, 7);
+                    if (!monthlyTotals[ym]) monthlyTotals[ym] = { customers: new Set(), orders: 0, revenue: 0 };
+                    monthlyTotals[ym].customers.add(customer.id);
+                    monthlyTotals[ym].orders += 1;
+                    monthlyTotals[ym].revenue += (o.amount || 0);
+                });
+                if (custHasAny) { custAll.add(customer.id); if (firstYmd) firstMonthByCust[customer.id] = firstYmd.slice(0, 7); }
                 if (range) {
                     if (hasOrderInRange) custInRange.add(customer.id);
-                    // Khách mới: đơn đầu tiên nằm trong range
                     if (firstYmd && firstYmd >= range.from && firstYmd <= range.to) newCustomers++;
                 }
-
-                // monthly totals (chế độ không range, dùng cho trend + khách mới tháng gần nhất)
-                Object.entries(customer.monthlyData || {}).forEach(([month, data]) => {
-                    if (!monthlyTotals[month]) monthlyTotals[month] = { customers: new Set(), orders: 0, revenue: 0 };
-                    monthlyTotals[month].customers.add(customer.id);
-                    monthlyTotals[month].orders += data.orders;
-                    monthlyTotals[month].revenue += data.revenue;
-                });
             });
 
             const sortedMonths = Object.keys(monthlyTotals).sort();
@@ -3573,31 +3671,17 @@
             // ===== Chế độ có RANGE filter =====
             if (range) {
                 const periodLabel = `Từ ${formatDateDDMMYYYY(range.from)} đến ${formatDateDDMMYYYY(range.to)}`;
-                return {
-                    range,
-                    periodLabel,
-                    totalCustomers: custInRange.size,
-                    totalOrders,
-                    totalRevenue,
-                    newCustomers,
-                    trends: null
-                };
+                return { range, periodLabel, totalCustomers: custInRange.size, totalOrders, totalRevenue, newCustomers, trends: null };
             }
 
-            // ===== Chế độ TOÀN THỜI GIAN (mặc định) =====
-            const totalCustomers = allCustomers.length;
-            const grandOrders = allCustomers.reduce((s, c) => s + (c.orders || 0), 0);
-            const grandRevenue = allCustomers.reduce((s, c) => s + (c.revenue || 0), 0);
+            // ===== Chế độ TOÀN THỜI GIAN =====
+            // Không filter nhân viên → tổng khách = toàn bộ; có filter → khách có đơn của nhân viên đó
+            const totalCustomers = emp ? custAll.size : allCustomers.length;
 
-            // Khách mới: đơn đầu tiên rơi vào tháng gần nhất
             const latestMonth = sortedMonths.length ? sortedMonths[sortedMonths.length - 1] : null;
             let newCustAllTime = 0;
             if (latestMonth) {
-                allCustomers.forEach(c => {
-                    const months = Object.keys(c.monthlyData || {});
-                    if (months.length === 0) return;
-                    if (months.sort()[0] === latestMonth) newCustAllTime++;
-                });
+                Object.values(firstMonthByCust).forEach(fm => { if (fm === latestMonth) newCustAllTime++; });
             }
             const periodLabel = latestMonth
                 ? `trong tháng ${parseInt(latestMonth.split('-')[1])}/${latestMonth.split('-')[0]}`
@@ -3615,15 +3699,7 @@
                 };
             }
 
-            return {
-                range: null,
-                periodLabel,
-                totalCustomers,
-                totalOrders: grandOrders,
-                totalRevenue: grandRevenue,
-                newCustomers: newCustAllTime,
-                trends
-            };
+            return { range: null, periodLabel, totalCustomers, totalOrders: grandOrders, totalRevenue: grandRevenue, newCustomers: newCustAllTime, trends };
         }
 
         // Format số tiền: 19,760,000,000 → "19.76 tỷ"
@@ -3773,7 +3849,7 @@
         async function apiPost(path, body) {
             const res = await fetch(apiUrl(path), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: devHeaders({ 'Content-Type': 'application/json' }),
                 credentials: 'include',
                 body: JSON.stringify(body)
             });
@@ -3785,7 +3861,7 @@
         async function apiPut(path, body) {
             const res = await fetch(apiUrl(path), {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: devHeaders({ 'Content-Type': 'application/json' }),
                 credentials: 'include',
                 body: JSON.stringify(body)
             });
@@ -3824,8 +3900,41 @@
             try {
                 const r = await apiGet('/api/follow');
                 followData = r.data || [];
+                populateFollowFilters();
                 renderFollowTable();
             } catch (e) { showToast('error', 'Lỗi tải Follow khách', e.message); }
+        }
+
+        // Đổ option cho dropdown lọc (Tài khoản admin + Website + Nhu cầu SP) từ dữ liệu follow
+        function populateFollowFilters() {
+            const webs = new Set(), sps = new Set(), owners = new Set();
+            followData.forEach(c => {
+                (Array.isArray(c.nhu_cau_website) ? c.nhu_cau_website : (c.nhu_cau_website ? [c.nhu_cau_website] : []))
+                    .forEach(w => { if (w) webs.add(w); });
+                if (c.nhu_cau_sp) sps.add(c.nhu_cau_sp);
+                if (c.owner_email) owners.add(c.owner_email);
+            });
+            const ownSel = document.getElementById('followOwnerFilter');
+            if (ownSel && currentUser?.isDekiAdmin) {
+                const cur = ownSel.value;
+                ownSel.innerHTML = '<option value="">Tất cả tài khoản</option>' +
+                    Array.from(owners).sort().map(o => `<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+                ownSel.value = cur;
+            }
+            const webSel = document.getElementById('followWebFilter');
+            if (webSel) {
+                const cur = webSel.value;
+                webSel.innerHTML = '<option value="">Tất cả website</option>' +
+                    Array.from(webs).sort().map(w => `<option value="${w.replace(/"/g,'&quot;')}">${webName(w)}</option>`).join('');
+                webSel.value = cur;
+            }
+            const spSel = document.getElementById('followSpFilter');
+            if (spSel) {
+                const cur = spSel.value;
+                spSel.innerHTML = '<option value="">Tất cả nhu cầu SP</option>' +
+                    Array.from(sps).sort().map(s => `<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
+                spSel.value = cur;
+            }
         }
 
         async function loadFollowTags() {
@@ -3845,9 +3954,18 @@
             const tbody = document.getElementById('followTableBody');
             if (!tbody) return;
             const q = removeDiacritics((document.getElementById('followSearch').value || '').trim()).toLowerCase();
+            const webF = document.getElementById('followWebFilter')?.value || '';
+            const spF = document.getElementById('followSpFilter')?.value || '';
+            const ownerF = document.getElementById('followOwnerFilter')?.value || '';
             const rows = followData.filter(c => {
-                if (!q) return true;
-                return removeDiacritics(c.name).toLowerCase().includes(q) || (c.phone || '').includes(q);
+                if (q && !(removeDiacritics(c.name).toLowerCase().includes(q) || (c.phone || '').includes(q))) return false;
+                if (ownerF && c.owner_email !== ownerF) return false;
+                if (webF) {
+                    const ws = Array.isArray(c.nhu_cau_website) ? c.nhu_cau_website : (c.nhu_cau_website ? [c.nhu_cau_website] : []);
+                    if (!ws.includes(webF)) return false;
+                }
+                if (spF && c.nhu_cau_sp !== spF) return false;
+                return true;
             });
             if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có khách hàng nào</td></tr>';
@@ -4066,7 +4184,16 @@
             document.getElementById('fWebSearch').value = '';
             renderFWebOptions();
             renderFWebChips();
-            document.getElementById('fNhuCauSp').value = f ? f.nhu_cau_sp : '';
+            const fNhuCauSpSel = document.getElementById('fNhuCauSp');
+            const spVal = f ? (f.nhu_cau_sp || '') : '';
+            // Xóa option động (data-custom) từ lần mở trước
+            [...fNhuCauSpSel.options].filter(o => o.dataset.custom).forEach(o => o.remove());
+            // Giữ lại giá trị cũ không nằm trong danh sách (tránh mất dữ liệu khi sửa)
+            if (spVal && ![...fNhuCauSpSel.options].some(o => o.value === spVal)) {
+                const opt = new Option(spVal, spVal); opt.dataset.custom = '1';
+                fNhuCauSpSel.add(opt);
+            }
+            fNhuCauSpSel.value = spVal;
             document.getElementById('fTinhTrang').value = f ? (f.bought ? 'Đã mua hàng' : f.tinh_trang) : '';
             document.getElementById('fNgayLienHe').value = f ? f.ngay_lien_he : '';
             document.getElementById('fGhiChu').value = f ? f.ghi_chu : '';
@@ -4131,18 +4258,33 @@
                 const qs = params.toString();
                 const r = await apiGet('/api/handover' + (qs ? '?' + qs : ''));
                 handoverData = r.data || [];
+                populateHandoverOwnerFilter();
                 renderHandoverTable();
             } catch (e) { showToast('error', 'Lỗi tải Bàn giao', e.message); }
+        }
+
+        // Đổ option Tài khoản (admin) cho tab Bàn giao
+        function populateHandoverOwnerFilter() {
+            const sel = document.getElementById('hoOwnerFilter');
+            if (!sel || !currentUser?.isDekiAdmin) return;
+            const owners = new Set();
+            handoverData.forEach(t => { if (t.owner_email) owners.add(t.owner_email); });
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">Tất cả tài khoản</option>' +
+                Array.from(owners).sort().map(o => `<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+            sel.value = cur;
         }
 
         function renderHandoverTable() {
             const tbody = document.getElementById('handoverTableBody');
             if (!tbody) return;
-            if (handoverData.length === 0) {
+            const ownerF = document.getElementById('hoOwnerFilter')?.value || '';
+            const rows = ownerF ? handoverData.filter(t => t.owner_email === ownerF) : handoverData;
+            if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có công việc nào</td></tr>';
                 return;
             }
-            tbody.innerHTML = handoverData.map((t, i) => {
+            tbody.innerHTML = rows.map((t, i) => {
                 const statusBadge = t.tinh_trang === 'done'
                     ? '<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--success);">Done</span>'
                     : '<span class="badge" style="background:rgba(245,158,11,0.12); color:var(--warning);">Pending</span>';
@@ -4563,6 +4705,9 @@
                 if (currentUser.isDekiAdmin) {
                     document.getElementById('navAdmin')?.classList.remove('section-hidden');
                     document.getElementById('adminActions')?.classList.remove('section-hidden');
+                    document.getElementById('dashEmployeeWrap')?.classList.remove('section-hidden');
+                    document.getElementById('followOwnerFilter')?.classList.remove('section-hidden');
+                    document.getElementById('hoOwnerWrap')?.classList.remove('section-hidden');
                 }
             } catch (err) {
                 showAuthBlocker(err);
@@ -4577,7 +4722,8 @@
             populateWebsiteFilter();
             populateEmployeeFilter();
             populateAdvancedFilterDropdowns();
-            renderCustomerTable(allCustomers);
+            populateDashEmployee();
+            switchCustTab('all');
             renderDashboardStats();
             refreshDashboardCharts();
             renderReports();
@@ -4831,7 +4977,15 @@
                             </div>
                         </div>
                     </div>
-                    <div><label class="cv-lbl">Nhu cầu SP</label><input type="text" id="fNhuCauSp" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Nhu cầu SP</label>
+                        <select id="fNhuCauSp" class="filter-select" style="width:100%">
+                            <option value="">— Chọn —</option>
+                            <option>Thời trang</option><option>Túi xách</option><option>Giày dép</option>
+                            <option>Mỹ phẩm</option><option>Nước hoa</option><option>Kính mắt</option>
+                            <option>Đồng hồ</option><option>Trang sức</option><option>Điện tử</option>
+                            <option>Khác</option>
+                        </select>
+                    </div>
                     <div><label class="cv-lbl">Tình trạng</label>
                         <select id="fTinhTrang" class="filter-select" style="width:100%">
                             <option value="">— Chọn —</option>
