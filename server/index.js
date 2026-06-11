@@ -555,6 +555,76 @@ app.post('/api/partner/segments-by-phones', requireApiKey(), async (req, res) =>
     }
 });
 
+// POST /api/partner/follow - thêm khách Follow (cho Zalo CRM). Không có session → owner_email lấy từ body.ownerEmail.
+// Body giống POST /api/follow nội bộ: { name*, phone, nhom_khach, fb_link, nguon_khach, nganh_hang,
+//   nhu_cau_website[], nhu_cau_sp, tinh_trang, ngay_lien_he, tags[], ghi_chu, ownerEmail }
+app.post('/api/partner/follow', requireApiKey(), async (req, res) => {
+    try {
+        const b = req.body || {};
+        if (!b.name) return res.status(400).json({ success: false, error: 'Thiếu tên khách hàng' });
+        const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
+        const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
+        const ownerEmail = String(b.ownerEmail || b.owner_email || '').trim().toLowerCase() || null;
+        const result = await db.query(
+            `INSERT INTO deki_follow_customers
+             (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu, owner_email)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
+             b.nganh_hang || null, websites, b.nhu_cau_sp || null,
+             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, ownerEmail]
+        );
+        if (b.tinh_trang || b.ngay_lien_he) {
+            await db.query(`INSERT INTO deki_follow_history (follow_id, tinh_trang, ngay_lien_he) VALUES (?,?,?)`,
+                [result.insertId, b.tinh_trang || null, b.ngay_lien_he || null]);
+        }
+        res.json({ success: true, id: result.insertId });
+    } catch (e) {
+        console.error('[api/partner/follow] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/partner/follow-by-phone?phone= - khách Follow đã tồn tại (khớp 9 số cuối) → Zalo CRM tránh thêm trùng.
+app.get('/api/partner/follow-by-phone', requireApiKey(), async (req, res) => {
+    try {
+        const core = String(req.query.phone || '').replace(/\D/g, '').slice(-9);
+        if (core.length < 8) return res.json({ success: true, found: false, follow: null });
+        const rows = await db.query(
+            `SELECT id, name, phone, nhom_khach, tinh_trang, owner_email FROM deki_follow_customers
+             WHERE RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) = ? ORDER BY id DESC LIMIT 1`, [core]);
+        if (!rows.length) return res.json({ success: true, found: false, follow: null });
+        res.json({ success: true, found: true, follow: rows[0] });
+    } catch (e) {
+        console.error('[api/partner/follow-by-phone] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /api/partner/follow-meta - tags + danh sách website (cho form Thêm khách ở Zalo CRM).
+app.get('/api/partner/follow-meta', requireApiKey(), async (req, res) => {
+    try {
+        const tagRows = await db.query(`SELECT name FROM deki_follow_tags ORDER BY name`);
+        const webRows = await db.query(
+            `SELECT DISTINCT website FROM deki_orders WHERE website IS NOT NULL AND website <> '' AND website <> 'N/A' ORDER BY website`);
+        res.json({ success: true, tags: tagRows.map(r => r.name), websites: webRows.map(r => r.website) });
+    } catch (e) {
+        console.error('[api/partner/follow-meta] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// POST /api/partner/follow-tags - tạo tag mới (cho form Thêm khách ở Zalo CRM).
+app.post('/api/partner/follow-tags', requireApiKey(), async (req, res) => {
+    try {
+        const name = String(req.body?.name || '').trim();
+        if (!name) return res.status(400).json({ success: false, error: 'Thiếu tên tag' });
+        await db.query(`INSERT IGNORE INTO deki_follow_tags (name) VALUES (?)`, [name]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ===== ĐƠN HÀNG: danh sách đơn (như Excel) + lọc nhân viên/thời gian + phân trang =====
 app.get('/api/orders', requireAuth(), async (req, res) => {
     try {
