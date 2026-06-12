@@ -1241,7 +1241,7 @@
             </div>
 
             <div class="filters">
-                <div class="filters-row">
+                <div class="filters-row" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                     <select class="filter-select" id="ordEmployee" onchange="loadOrders(1)">
                         <option value="">Tất cả nhân viên</option>
                     </select>
@@ -1252,11 +1252,18 @@
                         <option value="year">Năm</option>
                         <option value="custom">Tùy chọn</option>
                     </select>
+                    <select class="filter-select" id="ordBrand" onchange="loadOrders(1)">
+                        <option value="">Tất cả brand</option>
+                    </select>
                     <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
                         <input type="date" id="ordFrom" class="filter-select">
                         <span style="color:var(--text-light);">→</span>
                         <input type="date" id="ordTo" class="filter-select">
                         <button class="btn btn-primary" onclick="loadOrders(1)">Lọc</button>
+                    </div>
+                    <div style="margin-left:auto; text-align:right;">
+                        <div style="font-size:12px; color:var(--text-gray);">Doanh thu theo bộ lọc</div>
+                        <div id="ordRevenue" style="font-size:18px; font-weight:700; color:var(--primary);">0 đ</div>
                     </div>
                 </div>
             </div>
@@ -1811,7 +1818,7 @@
 
             list.innerHTML = pageOrders.map(order => `
                 <div class="order-item">
-                    <span class="order-code">${order.code || '-'}</span>
+                    <span class="order-code">${order.code ? `<a href="#" onclick="openBassoOrder('${String(order.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${order.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${order.code}</a>` : '-'}</span>
                     <div class="order-info">
                         <div>${order.website || '-'}</div>
                         <div class="order-date">${order.date || '-'}</div>
@@ -2027,7 +2034,7 @@
             } else {
                 orderList.innerHTML = recentOrders.map(order => `
                     <div class="order-item">
-                        <span class="order-code">${order.code || '-'}</span>
+                        <span class="order-code">${order.code ? `<a href="#" onclick="openBassoOrder('${String(order.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${order.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${order.code}</a>` : '-'}</span>
                         <div class="order-info">
                             <div>${order.website || '-'}</div>
                             <div class="order-date">${order.date || '-'}</div>
@@ -3253,6 +3260,12 @@
                 const sel = document.getElementById('ordEmployee');
                 sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
                     Array.from(emps).sort().map(e => `<option value="${e}">${e}</option>`).join('');
+                // Populate dropdown brand từ allCustomers (ShipUS/Basso/Asale/Stock...)
+                const brands = new Set();
+                allCustomers.forEach(c => (c.brands || []).forEach(b => { if (b && b !== 'N/A') brands.add(b); }));
+                const bsel = document.getElementById('ordBrand');
+                bsel.innerHTML = '<option value="">Tất cả brand</option>' +
+                    Array.from(brands).sort().map(b => `<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('');
                 ordEmployeesLoaded = true;
             }
             loadOrders(1);
@@ -3271,6 +3284,8 @@
             params.set('pageSize', 50);
             const emp = document.getElementById('ordEmployee').value;
             if (emp) params.set('employee', emp);
+            const brand = document.getElementById('ordBrand')?.value;
+            if (brand) params.set('brand', brand);
             const timeVal = document.getElementById('ordTime').value;
             let range = null;
             if (timeVal === 'custom') {
@@ -3292,6 +3307,8 @@
             const tbody = document.getElementById('ordersTableBody');
             const rows = r.data || [];
             document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('vi-VN') + ' đơn hàng';
+            const revEl = document.getElementById('ordRevenue');
+            if (revEl) revEl.textContent = (r.totalRevenue || 0).toLocaleString('vi-VN') + ' đ';
             if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
                 document.getElementById('ordPaginationInfo').textContent = '';
@@ -3523,8 +3540,7 @@
         // ===== DASHBOARD DATE FILTER =====
         let dashboardRange = null; // {from, to} hoặc null = toàn thời gian
         let dashEmployeeFilter = ''; // tên hiển thị đang chọn ('' = tất cả; chỉ admin)
-        let dashEmpStaffSet = null;  // Set tên Excel ứng với tên hiển thị đang chọn (null = không lọc)
-        let dashNameToStaff = {};    // tên hiển thị → Set(tên Excel) lấy từ /api/permissions
+        let dashEmpStaffSet = null;  // Set tên Excel đang lọc (null = không lọc)
 
         // Tìm ngày mới nhất có đơn trong data
         function getLatestDataDay() {
@@ -3597,33 +3613,24 @@
                 dashboardRange = dashRangeFromPreset(period);
             }
             dashEmployeeFilter = document.getElementById('dashEmployee')?.value || '';
-            dashEmpStaffSet = dashEmployeeFilter ? (dashNameToStaff[dashEmployeeFilter] || new Set()) : null;
+            dashEmpStaffSet = dashEmployeeFilter ? new Set([dashEmployeeFilter]) : null;
             renderDashboardStats();
             refreshDashboardCharts();
         }
 
-        // Populate dropdown nhân viên ở Dashboard theo TÊN HIỂN THỊ (admin only).
-        // Mỗi tên hiển thị (cấu hình ở Quản lý quyền) ánh xạ tới nhiều tên Excel (staff_names).
-        async function populateDashEmployee() {
+        // Populate dropdown nhân viên ở Dashboard theo TÊN NHÂN VIÊN EXCEL (admin only).
+        // Liệt kê từng tên trong cột nhân viên của đơn (loại các tên hệ thống ở EXCLUDED_EMPLOYEES).
+        function populateDashEmployee() {
             const sel = document.getElementById('dashEmployee');
             if (!sel || !currentUser?.isDekiAdmin) return;
-            try {
-                const res = await apiGet('/api/permissions');
-                const perms = res.data || [];
-                dashNameToStaff = {};
-                perms.forEach(u => {
-                    const dn = (u.name || '').trim();
-                    if (!dn) return;
-                    if (!dashNameToStaff[dn]) dashNameToStaff[dn] = new Set();
-                    (u.staff_names || []).forEach(n => { if (n) dashNameToStaff[dn].add(n); });
-                });
-                const cur = sel.value;
-                const names = Object.keys(dashNameToStaff)
-                    .filter(dn => dashNameToStaff[dn].size > 0).sort();
-                sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
-                    names.map(dn => `<option value="${dn.replace(/"/g, '&quot;')}">${dn}</option>`).join('');
-                sel.value = cur;
-            } catch (e) { /* không nạp được thì giữ "Tất cả nhân viên" */ }
+            const cur = sel.value;
+            const emps = new Set();
+            allCustomers.forEach(c => (c.employees || []).forEach(e => {
+                if (e && !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())) emps.add(e);
+            }));
+            sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
+                Array.from(emps).sort().map(e => `<option value="${e.replace(/"/g, '&quot;')}">${e}</option>`).join('');
+            sel.value = cur;
         }
 
         // Tính dashboard stats. range = {from,to} (YYYY-MM-DD) lọc theo khoảng; null = toàn thời gian.

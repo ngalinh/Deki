@@ -640,14 +640,17 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         }
         if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
         if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }
+        if (req.query.brand) { where.push('o.brand = ?'); params.push(req.query.brand); }
         const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize) || 50));
         const offset = (page - 1) * pageSize;
 
-        const totalRow = await db.query(`SELECT COUNT(*) AS cnt FROM deki_orders o ${whereSql}`, params);
+        // COUNT + SUM doanh thu theo bộ lọc hiện tại (toàn bộ, không chỉ trang)
+        const totalRow = await db.query(`SELECT COUNT(*) AS cnt, COALESCE(SUM(o.amount),0) AS revenue FROM deki_orders o ${whereSql}`, params);
         const total = Number(totalRow[0]?.cnt) || 0;
+        const totalRevenue = Number(totalRow[0]?.revenue) || 0;
 
         // LIMIT/OFFSET inline (đã validate là số nguyên → an toàn)
         const rows = await db.query(
@@ -670,7 +673,7 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
                 giam_gia: Number(r.giam_gia) || 0,
                 amount: Number(r.amount) || 0
             })),
-            total, page, pageSize
+            total, totalRevenue, page, pageSize
         });
     } catch (e) {
         console.error('[api/orders] error:', e);
