@@ -3918,7 +3918,8 @@
             followData.forEach(c => {
                 (Array.isArray(c.nhu_cau_website) ? c.nhu_cau_website : (c.nhu_cau_website ? [c.nhu_cau_website] : []))
                     .forEach(w => { if (w) webs.add(w); });
-                if (c.nhu_cau_sp) sps.add(c.nhu_cau_sp);
+                (Array.isArray(c.nhu_cau_sp) ? c.nhu_cau_sp : (c.nhu_cau_sp ? [c.nhu_cau_sp] : []))
+                    .forEach(s => { if (s) sps.add(s); });
                 if (c.owner_email) owners.add(c.owner_email);
             });
             const ownSel = document.getElementById('followOwnerFilter');
@@ -3971,7 +3972,10 @@
                     const ws = Array.isArray(c.nhu_cau_website) ? c.nhu_cau_website : (c.nhu_cau_website ? [c.nhu_cau_website] : []);
                     if (!ws.includes(webF)) return false;
                 }
-                if (spF && c.nhu_cau_sp !== spF) return false;
+                if (spF) {
+                    const ss = Array.isArray(c.nhu_cau_sp) ? c.nhu_cau_sp : (c.nhu_cau_sp ? [c.nhu_cau_sp] : []);
+                    if (!ss.includes(spF)) return false;
+                }
                 return true;
             });
             if (rows.length === 0) {
@@ -3996,7 +4000,7 @@
                         <td style="color:var(--text-gray);">${c.nguon_khach || '-'}</td>
                         <td style="color:var(--text-gray);">${c.nganh_hang || '-'}</td>
                         <td style="color:var(--text-gray);">${(Array.isArray(c.nhu_cau_website) && c.nhu_cau_website.length) ? c.nhu_cau_website.map(w => `<span class="row-tag">${webName(w)}</span>`).join('') : '-'}</td>
-                        <td style="color:var(--text-gray);">${c.nhu_cau_sp || '-'}</td>
+                        <td style="color:var(--text-gray);">${(Array.isArray(c.nhu_cau_sp) && c.nhu_cau_sp.length) ? c.nhu_cau_sp.map(s => `<span class="row-tag">${s}</span>`).join('') : '-'}</td>
                         <td>${statusBadge}</td>
                         <td>${lastContact ? `<span class="cv-history" onmouseenter="showHist(event, ${c.id})" onmousemove="moveHist(event)" onmouseleave="hideHist()">${fmtDateVN(lastContact)}${hasHist ? ` <span style="color:var(--text-light); font-size:11px;">(${c.history.length})</span>` : ''}</span>` : '-'}</td>
                         <td>${tagsHtml}</td>
@@ -4100,6 +4104,61 @@
             if (dd && dd.style.display === 'block' && !dd.contains(e.target) && box && !box.contains(e.target)) dd.style.display = 'none';
         });
 
+        // ===== Multi-select chip cho "Nhu cầu SP" (danh sách cố định) =====
+        const SP_OPTIONS = ['Thời trang', 'Túi xách', 'Giày dép', 'Mỹ phẩm', 'Nước hoa', 'Kính mắt', 'Đồng hồ', 'Trang sức', 'Điện tử', 'Khác'];
+        let fSelectedSp = [];
+        function renderFSpChips() {
+            const box = document.getElementById('fSpChips');
+            if (!box) return;
+            box.innerHTML = fSelectedSp.map(s =>
+                `<span class="web-chip">${s}<b onclick="removeFSp(event, '${s.replace(/'/g, "\\'")}')">×</b></span>`
+            ).join('');
+        }
+        function renderFSpOptions() {
+            const box = document.getElementById('fSpOptions');
+            if (!box) return;
+            // Gộp option cố định + giá trị cũ ngoài danh sách (giữ khi sửa khách)
+            const opts = [...SP_OPTIONS, ...fSelectedSp.filter(s => !SP_OPTIONS.includes(s))];
+            box.innerHTML = opts.map(s =>
+                `<label class="fsp-opt" data-sp="${removeDiacritics(s).toLowerCase()}" style="display:flex; align-items:center; gap:8px; padding:5px 6px; font-size:13px; cursor:pointer; border-radius:6px;">
+                    <input type="checkbox" value="${s.replace(/"/g, '&quot;')}" onchange="toggleFSpOption(this)" ${fSelectedSp.includes(s) ? 'checked' : ''}> ${s}
+                 </label>`).join('');
+        }
+        function filterFSpOptions() {
+            const q = removeDiacritics(document.getElementById('fSpSearch').value || '').trim().toLowerCase();
+            document.querySelectorAll('#fSpOptions .fsp-opt').forEach(el => {
+                el.style.display = (!q || el.dataset.sp.includes(q)) ? 'flex' : 'none';
+            });
+        }
+        function toggleFSpOption(cb) {
+            if (cb.checked) { if (!fSelectedSp.includes(cb.value)) fSelectedSp.push(cb.value); }
+            else fSelectedSp = fSelectedSp.filter(s => s !== cb.value);
+            renderFSpChips();
+            const s = document.getElementById('fSpSearch');
+            if (s) { s.value = ''; filterFSpOptions(); s.focus(); }
+        }
+        function removeFSp(e, s) {
+            if (e) e.stopPropagation();
+            fSelectedSp = fSelectedSp.filter(x => x !== s);
+            renderFSpOptions();
+            renderFSpChips();
+        }
+        function fSpKeydown(e) {
+            if (e.key === 'Backspace' && !e.target.value && fSelectedSp.length) {
+                removeFSp(e, fSelectedSp[fSelectedSp.length - 1]);
+            }
+        }
+        function openFSpDropdown(e) {
+            const dd = document.getElementById('fSpDropdown');
+            dd.style.display = 'block';
+            const s = document.getElementById('fSpSearch'); s.focus();
+        }
+        document.addEventListener('click', (e) => {
+            const dd = document.getElementById('fSpDropdown');
+            const box = document.getElementById('fSpBox');
+            if (dd && dd.style.display === 'block' && !dd.contains(e.target) && box && !box.contains(e.target)) dd.style.display = 'none';
+        });
+
         // ===== Autocomplete "Khách hàng" theo data khách (tên/SĐT) =====
         function onFNameInput() {
             const dd = document.getElementById('fNameDropdown');
@@ -4191,16 +4250,11 @@
             document.getElementById('fWebSearch').value = '';
             renderFWebOptions();
             renderFWebChips();
-            const fNhuCauSpSel = document.getElementById('fNhuCauSp');
-            const spVal = f ? (f.nhu_cau_sp || '') : '';
-            // Xóa option động (data-custom) từ lần mở trước
-            [...fNhuCauSpSel.options].filter(o => o.dataset.custom).forEach(o => o.remove());
-            // Giữ lại giá trị cũ không nằm trong danh sách (tránh mất dữ liệu khi sửa)
-            if (spVal && ![...fNhuCauSpSel.options].some(o => o.value === spVal)) {
-                const opt = new Option(spVal, spVal); opt.dataset.custom = '1';
-                fNhuCauSpSel.add(opt);
-            }
-            fNhuCauSpSel.value = spVal;
+            fSelectedSp = f ? [...(Array.isArray(f.nhu_cau_sp) ? f.nhu_cau_sp : (f.nhu_cau_sp ? [f.nhu_cau_sp] : []))] : [];
+            document.getElementById('fSpDropdown').style.display = 'none';
+            document.getElementById('fSpSearch').value = '';
+            renderFSpOptions();
+            renderFSpChips();
             document.getElementById('fTinhTrang').value = f ? (f.bought ? 'Đã mua hàng' : f.tinh_trang) : '';
             document.getElementById('fNgayLienHe').value = f ? f.ngay_lien_he : '';
             document.getElementById('fGhiChu').value = f ? f.ghi_chu : '';
@@ -4223,7 +4277,7 @@
                 nguon_khach: document.getElementById('fNguonKhach').value,
                 nganh_hang: document.getElementById('fNganhHang').value,
                 nhu_cau_website: fSelectedWebsites,
-                nhu_cau_sp: document.getElementById('fNhuCauSp').value.trim(),
+                nhu_cau_sp: fSelectedSp,
                 tinh_trang: document.getElementById('fTinhTrang').value,
                 ngay_lien_he: document.getElementById('fNgayLienHe').value || null,
                 tags: selectedTags,
@@ -4985,13 +5039,15 @@
                         </div>
                     </div>
                     <div><label class="cv-lbl">Nhu cầu SP</label>
-                        <select id="fNhuCauSp" class="filter-select" style="width:100%">
-                            <option value="">— Chọn —</option>
-                            <option>Thời trang</option><option>Túi xách</option><option>Giày dép</option>
-                            <option>Mỹ phẩm</option><option>Nước hoa</option><option>Kính mắt</option>
-                            <option>Đồng hồ</option><option>Trang sức</option><option>Điện tử</option>
-                            <option>Khác</option>
-                        </select>
+                        <div style="position:relative;">
+                            <div id="fSpBox" class="chips-input" onclick="openFSpDropdown(event)" style="min-height:36px;">
+                                <span id="fSpChips"></span>
+                                <input type="text" id="fSpSearch" placeholder="Chọn nhu cầu SP..." oninput="filterFSpOptions()" onkeydown="fSpKeydown(event)">
+                            </div>
+                            <div id="fSpDropdown" style="display:none; position:absolute; top:104%; left:0; right:0; z-index:70; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); padding:8px;">
+                                <div id="fSpOptions" style="max-height:300px; overflow:auto;"></div>
+                            </div>
+                        </div>
                     </div>
                     <div><label class="cv-lbl">Tình trạng</label>
                         <select id="fTinhTrang" class="filter-select" style="width:100%">

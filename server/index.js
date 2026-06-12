@@ -759,18 +759,18 @@ app.get('/api/follow', requireAuth(), async (req, res) => {
             const bought = core.length >= 8 && boughtCores.has(core);
             let tags = [];
             try { tags = r.tags ? JSON.parse(r.tags) : []; } catch { tags = []; }
-            // nhu_cau_website: JSON array; fallback nếu là chuỗi đơn cũ
-            let websites = [];
-            if (r.nhu_cau_website) {
-                try {
-                    const parsed = JSON.parse(r.nhu_cau_website);
-                    websites = Array.isArray(parsed) ? parsed : [String(r.nhu_cau_website)];
-                } catch { websites = [String(r.nhu_cau_website)]; }
-            }
+            // nhu_cau_website + nhu_cau_sp: JSON array; fallback nếu là chuỗi đơn cũ
+            const parseArr = (raw) => {
+                if (!raw) return [];
+                try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [String(raw)]; }
+                catch { return [String(raw)]; }
+            };
+            const websites = parseArr(r.nhu_cau_website);
+            const sps = parseArr(r.nhu_cau_sp);
             return {
                 id: r.id, name: r.name, phone: r.phone || '', nhom_khach: r.nhom_khach || '',
                 fb_link: r.fb_link || '', nguon_khach: r.nguon_khach || '', nganh_hang: r.nganh_hang || '',
-                nhu_cau_website: websites, nhu_cau_sp: r.nhu_cau_sp || '',
+                nhu_cau_website: websites, nhu_cau_sp: sps,
                 tinh_trang: bought ? 'Đã mua hàng' : (r.tinh_trang || ''),
                 bought,
                 ngay_lien_he: r.ngay_lien_he ? new Date(r.ngay_lien_he).toISOString().slice(0, 10) : '',
@@ -793,12 +793,13 @@ app.post('/api/follow', requireAuth(), async (req, res) => {
         if (!b.name) return res.status(400).json({ success: false, error: 'Thiếu tên khách hàng' });
         const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
         const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
+        const sps = Array.isArray(b.nhu_cau_sp) ? JSON.stringify(b.nhu_cau_sp) : (b.nhu_cau_sp || null);
         const result = await db.query(
             `INSERT INTO deki_follow_customers
              (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu, owner_email)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
-             b.nganh_hang || null, websites, b.nhu_cau_sp || null,
+             b.nganh_hang || null, websites, sps,
              b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, req.user.email]
         );
         // Ghi history nếu có tình trạng / ngày liên hệ
@@ -826,13 +827,14 @@ app.put('/api/follow/:id', requireAuth(), async (req, res) => {
         }
         const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
         const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
+        const sps = Array.isArray(b.nhu_cau_sp) ? JSON.stringify(b.nhu_cau_sp) : (b.nhu_cau_sp || null);
         await db.query(
             `UPDATE deki_follow_customers SET
              name=?, phone=?, nhom_khach=?, fb_link=?, nguon_khach=?, nganh_hang=?,
              nhu_cau_website=?, nhu_cau_sp=?, tinh_trang=?, ngay_lien_he=?, tags=?, ghi_chu=?
              WHERE id=?`,
             [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
-             b.nganh_hang || null, websites, b.nhu_cau_sp || null,
+             b.nganh_hang || null, websites, sps,
              b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, id]
         );
         // Ghi history nếu tình trạng HOẶC ngày liên hệ thay đổi
