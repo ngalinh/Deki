@@ -564,13 +564,14 @@ app.post('/api/partner/follow', requireApiKey(), async (req, res) => {
         if (!b.name) return res.status(400).json({ success: false, error: 'Thiếu tên khách hàng' });
         const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
         const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
+        const sps = Array.isArray(b.nhu_cau_sp) ? JSON.stringify(b.nhu_cau_sp) : (b.nhu_cau_sp || null);
         const ownerEmail = String(b.ownerEmail || b.owner_email || '').trim().toLowerCase() || null;
         const result = await db.query(
             `INSERT INTO deki_follow_customers
              (name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang, nhu_cau_website, nhu_cau_sp, tinh_trang, ngay_lien_he, tags, ghi_chu, owner_email)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
-             b.nganh_hang || null, websites, b.nhu_cau_sp || null,
+             b.nganh_hang || null, websites, sps,
              b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, ownerEmail]
         );
         if (b.tinh_trang || b.ngay_lien_he) {
@@ -584,18 +585,64 @@ app.post('/api/partner/follow', requireApiKey(), async (req, res) => {
     }
 });
 
-// GET /api/partner/follow-by-phone?phone= - khách Follow đã tồn tại (khớp 9 số cuối) → Zalo CRM tránh thêm trùng.
+// GET /api/partner/follow-by-phone?phone= - khách Follow đã tồn tại (khớp 9 số cuối).
+// Trả ĐỦ field (đã parse mảng) → Zalo CRM dùng để tránh trùng + prefill modal Sửa.
 app.get('/api/partner/follow-by-phone', requireApiKey(), async (req, res) => {
     try {
         const core = String(req.query.phone || '').replace(/\D/g, '').slice(-9);
         if (core.length < 8) return res.json({ success: true, found: false, follow: null });
         const rows = await db.query(
-            `SELECT id, name, phone, nhom_khach, tinh_trang, owner_email FROM deki_follow_customers
+            `SELECT id, name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang,
+                    nhu_cau_website, nhu_cau_sp, tinh_trang,
+                    DATE_FORMAT(ngay_lien_he, '%Y-%m-%d') AS ngay_lien_he, tags, ghi_chu, owner_email
+             FROM deki_follow_customers
              WHERE RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) = ? ORDER BY id DESC LIMIT 1`, [core]);
         if (!rows.length) return res.json({ success: true, found: false, follow: null });
-        res.json({ success: true, found: true, follow: rows[0] });
+        const r = rows[0];
+        const parseArr = (v) => { if (!v) return []; try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; } };
+        const follow = {
+            id: r.id, name: r.name, phone: r.phone || '', nhom_khach: r.nhom_khach || '',
+            fb_link: r.fb_link || '', nguon_khach: r.nguon_khach || '', nganh_hang: r.nganh_hang || '',
+            nhu_cau_website: parseArr(r.nhu_cau_website), nhu_cau_sp: parseArr(r.nhu_cau_sp),
+            tinh_trang: r.tinh_trang || '', ngay_lien_he: r.ngay_lien_he || '',
+            tags: parseArr(r.tags), ghi_chu: r.ghi_chu || '', owner_email: r.owner_email || '',
+        };
+        res.json({ success: true, found: true, follow });
     } catch (e) {
         console.error('[api/partner/follow-by-phone] error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// PUT /api/partner/follow/:id - sửa khách Follow (cho Zalo CRM). Update theo id, không đổi owner_email.
+app.put('/api/partner/follow/:id', requireApiKey(), async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const b = req.body || {};
+        if (!b.name) return res.status(400).json({ success: false, error: 'Thiếu tên khách hàng' });
+        const old = await db.query(`SELECT tinh_trang, DATE_FORMAT(ngay_lien_he,'%Y-%m-%d') AS ngay_lien_he FROM deki_follow_customers WHERE id = ?`, [id]);
+        if (old.length === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy' });
+        const tags = Array.isArray(b.tags) ? JSON.stringify(b.tags) : '[]';
+        const websites = Array.isArray(b.nhu_cau_website) ? JSON.stringify(b.nhu_cau_website) : (b.nhu_cau_website || null);
+        const sps = Array.isArray(b.nhu_cau_sp) ? JSON.stringify(b.nhu_cau_sp) : (b.nhu_cau_sp || null);
+        await db.query(
+            `UPDATE deki_follow_customers SET
+             name=?, phone=?, nhom_khach=?, fb_link=?, nguon_khach=?, nganh_hang=?,
+             nhu_cau_website=?, nhu_cau_sp=?, tinh_trang=?, ngay_lien_he=?, tags=?, ghi_chu=?
+             WHERE id=?`,
+            [b.name, b.phone || null, b.nhom_khach || null, b.fb_link || null, b.nguon_khach || null,
+             b.nganh_hang || null, websites, sps,
+             b.tinh_trang || null, b.ngay_lien_he || null, tags, b.ghi_chu || null, id]
+        );
+        const changed = (b.tinh_trang || '') !== (old[0].tinh_trang || '') ||
+                        (b.ngay_lien_he || '') !== (old[0].ngay_lien_he || '');
+        if (changed && (b.tinh_trang || b.ngay_lien_he)) {
+            await db.query(`INSERT INTO deki_follow_history (follow_id, tinh_trang, ngay_lien_he) VALUES (?,?,?)`,
+                [id, b.tinh_trang || null, b.ngay_lien_he || null]);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[api/partner/follow PUT] error:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
