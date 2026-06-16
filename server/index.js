@@ -486,7 +486,25 @@ app.delete('/api/customers', requireAuth(), async (req, res) => {
 
 // ===== Partner API (server-to-server, auth bằng API key) =====
 // Cho Zalo CRM tra thông tin khách + đơn theo SĐT. KHÔNG dùng session basso, không scope theo nhân viên.
-// GET /api/partner/customer-by-phone?phone=09xxxxxxxx
+// Phân quyền theo email (cho Zalo CRM lọc đơn theo nhân viên đang đăng nhập).
+// Trả { scoped, isAdmin, staffNames }. scoped=false → không lọc (không truyền forEmail).
+async function resolveStaffScope(email) {
+    const e = String(email || '').trim().toLowerCase();
+    if (!e) return { scoped: false, isAdmin: false, staffNames: [] };
+    const admin = await isDekiAdmin(e); // gồm cả super admin (env) + cột is_admin
+    if (admin) return { scoped: true, isAdmin: true, staffNames: [] };
+    const rows = await db.query('SELECT staff_name FROM deki_permissions WHERE email = ? LIMIT 1', [e]);
+    let staffNames = [];
+    if (rows.length && rows[0].staff_name) {
+        try { const p = JSON.parse(rows[0].staff_name); staffNames = Array.isArray(p) ? p : [String(rows[0].staff_name)]; }
+        catch { staffNames = [String(rows[0].staff_name)]; }
+    }
+    return { scoped: true, isAdmin: false, staffNames };
+}
+
+// GET /api/partner/customer-by-phone?phone=09xxxxxxxx[&forEmail=...]
+// forEmail: lọc đơn theo nhân viên (giống phân quyền Deki). admin → tất cả; nhân viên → đơn employee IN staff_name;
+// chưa map (không có quyền/không gắn nhân viên) → KHÔNG đơn nào. Tổng đơn/doanh thu tính lại theo đơn đã lọc.
 app.get('/api/partner/customer-by-phone', requireApiKey(), async (req, res) => {
     try {
         const raw = String(req.query.phone || '').trim();
@@ -505,21 +523,40 @@ app.get('/api/partner/customer-by-phone', requireApiKey(), async (req, res) => {
             return res.json({ success: true, found: false, customer: null, orders: [] });
         }
         const c = customers[0];
-        const orders = await db.query(
-            `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%m-%Y') AS date,
-                    website, brand, employee, amount
-             FROM deki_orders WHERE customer_id = ? ORDER BY order_date DESC`,
-            [c.id]
-        );
+
+        const scope = await resolveStaffScope(req.query.forEmail);
+        // Nhân viên chưa map (không admin + không gắn nhân viên nào) → không trả đơn nào.
+        const noOrders = scope.scoped && !scope.isAdmin && scope.staffNames.length === 0;
+
+        let orders = [];
+        if (!noOrders) {
+            let orderSql = `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%m-%Y') AS date,
+                                   website, brand, employee, amount
+                            FROM deki_orders WHERE customer_id = ?`;
+            const orderParams = [c.id];
+            // Nhân viên thường → chỉ đơn mình duyệt (employee IN staff_names).
+            if (scope.scoped && !scope.isAdmin) {
+                orderSql += ` AND employee IN (${scope.staffNames.map(() => '?').join(',')})`;
+                orderParams.push(...scope.staffNames);
+            }
+            orderSql += ` ORDER BY order_date DESC`;
+            orders = await db.query(orderSql, orderParams);
+        }
+        orders = orders.map(o => ({ ...o, amount: Number(o.amount) || 0 }));
+
+        // forEmail có → tổng tính lại theo đơn đã lọc (khớp danh sách hiển thị); không có → giữ tổng gốc của khách.
+        const scopedTotals = !!String(req.query.forEmail || '').trim();
+        const totalOrders = scopedTotals ? orders.length : (Number(c.total_orders) || 0);
+        const totalRevenue = scopedTotals ? orders.reduce((s, o) => s + o.amount, 0) : (Number(c.total_revenue) || 0);
+
         res.json({
             success: true,
             found: true,
             customer: {
                 id: c.id, name: c.name, phone: c.phone || '', segment: c.segment,
-                totalOrders: Number(c.total_orders) || 0,
-                totalRevenue: Number(c.total_revenue) || 0,
+                totalOrders, totalRevenue,
             },
-            orders: orders.map(o => ({ ...o, amount: Number(o.amount) || 0 })),
+            orders,
         });
     } catch (e) {
         console.error('[api/partner/customer-by-phone] error:', e);
