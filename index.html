@@ -1187,6 +1187,9 @@
                             </button>
                             <div id="segWebsiteDropdown" style="display:none; position:absolute; top:110%; left:0; z-index:60; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.12); max-height:280px; overflow:auto; min-width:240px; padding:8px;"></div>
                         </div>
+                        <select class="filter-select" id="segEmployeeFilter" onchange="renderSegmentTable()">
+                            <option value="">Tất cả nhân viên</option>
+                        </select>
                         <div class="search-box">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
@@ -1242,9 +1245,6 @@
 
             <div class="filters">
                 <div class="filters-row" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-                    <select class="filter-select" id="ordEmployee" onchange="loadOrders(1)">
-                        <option value="">Tất cả nhân viên</option>
-                    </select>
                     <select class="filter-select" id="ordTime" onchange="onOrdTimeChange()">
                         <option value="all">Tất cả thời gian</option>
                         <option value="week">Tuần</option>
@@ -1255,11 +1255,23 @@
                     <select class="filter-select" id="ordBrand" onchange="loadOrders(1)">
                         <option value="">Tất cả brand</option>
                     </select>
+                    <select class="filter-select" id="ordSegment" onchange="loadOrders(1)">
+                        <option value="">Tất cả phân nhóm</option>
+                    </select>
+                    <select class="filter-select" id="ordEmployee" onchange="loadOrders(1)">
+                        <option value="">Tất cả nhân viên</option>
+                    </select>
                     <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
                         <input type="date" id="ordFrom" class="filter-select">
                         <span style="color:var(--text-light);">→</span>
                         <input type="date" id="ordTo" class="filter-select">
                         <button class="btn btn-primary" onclick="loadOrders(1)">Lọc</button>
+                    </div>
+                    <div class="search-box" style="flex:1; min-width:240px; max-width:360px;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="ordSearch" placeholder="Tìm tên / SĐT / mã đơn..." oninput="ordSearchDebounced()">
                     </div>
                     <div style="margin-left:auto; text-align:right;">
                         <div style="font-size:12px; color:var(--text-gray);">Doanh thu theo bộ lọc</div>
@@ -2506,6 +2518,7 @@
             populateAdvancedFilterDropdowns();
             populateDashEmployee();
             buildSegWebsiteDropdown();
+            populateSegEmployeeFilter();
             renderSegmentTable();   // view khách hiện tại (mọi tab dùng chung)
             renderDashboardStats();
             refreshDashboardCharts();
@@ -2972,6 +2985,8 @@
             buildSegWebsiteDropdown();
             document.getElementById('segWebsiteCount').textContent = 'tất cả';
             const ss = document.getElementById('segSearch'); if (ss) ss.value = '';
+            const se = document.getElementById('segEmployeeFilter'); if (se) se.value = '';
+            populateSegEmployeeFilter();
             renderSegmentTable();
         }
 
@@ -3094,6 +3109,20 @@
             renderSegmentTable();
         }
 
+        // Đổ option dropdown nhân viên (tên Excel) cho thanh lọc khách — dùng chung 4 tab.
+        function populateSegEmployeeFilter() {
+            const sel = document.getElementById('segEmployeeFilter');
+            if (!sel) return;
+            const cur = sel.value;
+            const emps = new Set();
+            allCustomers.forEach(c => (c.employees || []).forEach(e => {
+                if (e && !EXCLUDED_EMPLOYEES.includes(e.toLowerCase())) emps.add(e);
+            }));
+            sel.innerHTML = '<option value="">Tất cả nhân viên</option>' +
+                Array.from(emps).sort().map(e => `<option value="${e.replace(/"/g, '&quot;')}">${e}</option>`).join('');
+            sel.value = cur;
+        }
+
         function renderSegmentTable(keepPage) {
             if (!keepPage) segCurrentPage = 1;   // filter/search/sort đổi → về trang 1
             const segs = SEGMENT_MAP[custTab] || null;   // null = tất cả phân nhóm (tab "Tất cả")
@@ -3104,6 +3133,7 @@
             const lastRange = resolveTimeRange('segLastOrderFilter', 'segLastFrom', 'segLastTo');
             const q = removeDiacritics((document.getElementById('segSearch').value || '').trim()).toLowerCase();
             const webSet = segSelectedWebsites;
+            const empF = document.getElementById('segEmployeeFilter')?.value || '';
 
             // Tính metrics theo filter cho từng khách thuộc segment
             const rows = [];
@@ -3116,9 +3146,10 @@
                 (c.allOrders || []).forEach(o => {
                     const ymd = parseDateToDay(o.date);
                     if (ymd && (!lastOrder || ymd > lastOrder)) lastOrder = ymd; // đơn gần nhất (toàn bộ)
-                    // áp filter thời gian + website cho metrics
+                    // áp filter thời gian + website + nhân viên cho metrics
                     if (timeRange && (!ymd || ymd < timeRange.from || ymd > timeRange.to)) return;
                     if (webSet.length && !webSet.includes(o.website)) return;
+                    if (empF && o.employee !== empF) return;
                     orders += 1;
                     revenue += (o.amount || 0);
                     if (o.website && o.website !== 'N/A') websitesSet.add(o.website);
@@ -3266,6 +3297,12 @@
                 const bsel = document.getElementById('ordBrand');
                 bsel.innerHTML = '<option value="">Tất cả brand</option>' +
                     Array.from(brands).sort().map(b => `<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('');
+                // Populate dropdown phân nhóm khách từ allCustomers
+                const segs = new Set();
+                allCustomers.forEach(c => { if (c.segment && c.segment !== 'N/A') segs.add(c.segment); });
+                const ssel = document.getElementById('ordSegment');
+                ssel.innerHTML = '<option value="">Tất cả phân nhóm</option>' +
+                    Array.from(segs).sort().map(s => `<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
                 ordEmployeesLoaded = true;
             }
             loadOrders(1);
@@ -3277,15 +3314,25 @@
             if (v !== 'custom') loadOrders(1);
         }
 
+        let ordSearchTimer;
+        function ordSearchDebounced() {
+            clearTimeout(ordSearchTimer);
+            ordSearchTimer = setTimeout(() => loadOrders(1), 350);
+        }
+
         async function loadOrders(page) {
             ordPage = page || 1;
             const params = new URLSearchParams();
             params.set('page', ordPage);
             params.set('pageSize', 50);
+            const q = document.getElementById('ordSearch')?.value.trim();
+            if (q) params.set('q', q);
             const emp = document.getElementById('ordEmployee').value;
             if (emp) params.set('employee', emp);
             const brand = document.getElementById('ordBrand')?.value;
             if (brand) params.set('brand', brand);
+            const segment = document.getElementById('ordSegment')?.value;
+            if (segment) params.set('segment', segment);
             const timeVal = document.getElementById('ordTime').value;
             let range = null;
             if (timeVal === 'custom') {
