@@ -1293,8 +1293,8 @@
                         <span class="dot"></span>
                     </button>
                     <div class="hdr-user">
-                        <div class="av hdr-user-av">NL</div>
-                        <span class="nm hdr-user-name">Nga Linh</span>
+                        <div class="av hdr-user-av"></div>
+                        <span class="nm hdr-user-name"></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </div>
                 </div>
@@ -1445,8 +1445,8 @@
                         <span class="dot"></span>
                     </button>
                     <div class="hdr-user">
-                        <div class="av hdr-user-av">NL</div>
-                        <span class="nm hdr-user-name">Nga Linh</span>
+                        <div class="av hdr-user-av"></div>
+                        <span class="nm hdr-user-name"></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </div>
                 </div>
@@ -1876,8 +1876,8 @@
                         <span class="dot"></span>
                     </button>
                     <div class="hdr-user">
-                        <div class="av hdr-user-av">NL</div>
-                        <span class="nm hdr-user-name">Nga Linh</span>
+                        <div class="av hdr-user-av"></div>
+                        <span class="nm hdr-user-name"></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </div>
                 </div>
@@ -1953,8 +1953,8 @@
                         <span class="dot"></span>
                     </button>
                     <div class="hdr-user">
-                        <div class="av hdr-user-av">NL</div>
-                        <span class="nm hdr-user-name">Nga Linh</span>
+                        <div class="av hdr-user-av"></div>
+                        <span class="nm hdr-user-name"></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </div>
                 </div>
@@ -4393,7 +4393,18 @@
                 : name.slice(0, 2)).toUpperCase();
             document.querySelectorAll('.hdr-user-name').forEach(el => el.textContent = name);
             document.querySelectorAll('.hdr-user-av').forEach(el => el.textContent = initials);
+            // Cache để lần F5 sau hiện đúng tên ngay (tránh nháy)
+            try { localStorage.setItem('deki_user_name', name); localStorage.setItem('deki_user_av', initials); } catch (e) {}
         }
+        // Đổ tên user từ cache ngay khi script chạy (header element đã có) → không nháy placeholder
+        (function prefillHeaderUser() {
+            try {
+                const n = localStorage.getItem('deki_user_name');
+                const a = localStorage.getItem('deki_user_av');
+                if (n) document.querySelectorAll('.hdr-user-name').forEach(el => el.textContent = n);
+                if (a) document.querySelectorAll('.hdr-user-av').forEach(el => el.textContent = a);
+            } catch (e) {}
+        })();
 
         // Bấm "Thống kê" → set dashboardRange + render lại stat cards
         function applyDashboardFilter() {
