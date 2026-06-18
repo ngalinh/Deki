@@ -1,20 +1,23 @@
 /* Deki CRM — Service Worker (PWA)
+   Đường dẫn TƯƠNG ĐỐI để hoạt động cả khi deploy dưới subpath /b/<id>/.
    - App shell precache (offline mở được khung app)
-   - Trang (navigate): network-first, fallback cache '/'
-   - /api/: luôn network (không cache — dữ liệu phải mới)
-   - Asset tĩnh + CDN (font, chart.js, xlsx): stale-while-revalidate
+   - Trang (navigate): network-first, fallback khung app đã cache
+   - .../api/...: luôn network (dữ liệu phải mới)
+   - Asset tĩnh + CDN: stale-while-revalidate
 */
-const VERSION = 'deki-v2';
+const VERSION = 'deki-v3';
+// Tương đối với vị trí sw.js (scope) — đúng cả root lẫn subpath
 const SHELL = [
-  '/',
-  '/manifest.webmanifest',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/icon-maskable-192.png',
-  '/icon-maskable-512.png',
-  '/apple-touch-icon.png',
-  '/deki-icon-white.png',
+  './',
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png',
+  './apple-touch-icon.png',
+  './deki-icon-white.png',
 ];
+const START = new URL('./', self.location).href;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -35,13 +38,13 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;                 // chỉ xử lý GET
   const url = new URL(req.url);
 
-  // API: luôn lấy từ mạng, không đụng cache
-  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+  // API: luôn lấy từ mạng, không đụng cache (path-agnostic vì có thể nằm dưới subpath)
+  if (url.pathname.includes('/api/')) return;
 
   // Điều hướng trang: network-first, offline thì trả khung app đã cache
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => caches.match('/', { ignoreSearch: true }).then((r) => r || caches.match(req)))
+      fetch(req).catch(() => caches.match(START, { ignoreSearch: true }).then((r) => r || caches.match(req)))
     );
     return;
   }
