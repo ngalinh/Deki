@@ -484,6 +484,39 @@ app.delete('/api/customers', requireAuth(), async (req, res) => {
     }
 });
 
+// DELETE /api/orders?from=&to= - xóa đơn theo khoảng NGÀY ĐẶT (admin). Sau xóa: recompute tổng + bỏ khách không còn đơn.
+app.delete('/api/orders', requireAuth(), async (req, res) => {
+    if (!req.user.isDekiAdmin) {
+        return res.status(403).json({ success: false, error: 'Chỉ admin được phép xóa' });
+    }
+    const from = (req.query.from || '').trim();
+    const to = (req.query.to || '').trim();
+    try {
+        let result;
+        if (from && to) {
+            result = await db.query('DELETE FROM deki_orders WHERE DATE(order_date) BETWEEN ? AND ?', [from, to]);
+        } else if (from) {
+            result = await db.query('DELETE FROM deki_orders WHERE DATE(order_date) >= ?', [from]);
+        } else if (to) {
+            result = await db.query('DELETE FROM deki_orders WHERE DATE(order_date) <= ?', [to]);
+        } else {
+            result = await db.query('DELETE FROM deki_orders');
+        }
+        const deleted = (result && result.affectedRows) || 0;
+        // Tính lại tổng đơn/doanh thu cho khách + xóa khách không còn đơn nào
+        await db.query(`
+            UPDATE deki_customers c
+            LEFT JOIN (SELECT customer_id, COUNT(*) AS cnt, SUM(amount) AS total FROM deki_orders GROUP BY customer_id) o
+              ON o.customer_id = c.id
+            SET c.total_orders = COALESCE(o.cnt, 0), c.total_revenue = COALESCE(o.total, 0)
+        `);
+        await db.query('DELETE c FROM deki_customers c LEFT JOIN deki_orders o ON o.customer_id = c.id WHERE o.customer_id IS NULL');
+        res.json({ success: true, deleted });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ===== Partner API (server-to-server, auth bằng API key) =====
 // Cho Zalo CRM tra thông tin khách + đơn theo SĐT. KHÔNG dùng session basso, không scope theo nhân viên.
 // Phân quyền theo email (cho Zalo CRM lọc đơn theo nhân viên đang đăng nhập).
@@ -1050,6 +1083,12 @@ app.delete('/api/handover/:id', requireAuth(), async (req, res) => {
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+// Favicon: trả icon Deki (tránh SPA fallback trả index.html cho /favicon.ico)
+app.get('/favicon.ico', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=604800');
+    res.sendFile(path.join(ROOT_DIR, 'favicon-32.png'));
 });
 
 // SPA fallback: gửi index.html cho mọi route không match (trừ /api)

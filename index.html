@@ -12,6 +12,9 @@
     <!-- PWA -->
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#dde3cc">
+    <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -1169,6 +1172,30 @@
         .web-chip { display:inline-flex; align-items:center; gap:5px; background:#f1f1fe; border:1px solid #c7c6f1; color:#6155cf; border-radius:999px; padding:2px 7px 2px 10px; font-size:12px; font-weight:700; white-space:nowrap; }
         .web-chip b { cursor:pointer; font-weight:700; line-height:1; }
         .web-chip b:hover { color:var(--error); }
+
+        /* Option multi-select: hàng đã chọn nền periwinkle như chip + checkbox bo góc, màu tím */
+        .fweb-opt, .fsp-opt, .seg-web-opt, .pstaff-opt { border-radius: 8px; transition: background .12s; }
+        .fweb-opt:hover, .fsp-opt:hover, .seg-web-opt:hover, .pstaff-opt:hover { background: #f4f5ec; }
+        .fweb-opt:has(input:checked), .fsp-opt:has(input:checked),
+        .seg-web-opt:has(input:checked), .pstaff-opt:has(input:checked) {
+            background: #f1f1fe; color: #6155cf; font-weight: 600;
+        }
+        .fweb-opt input[type=checkbox], .fsp-opt input[type=checkbox],
+        .seg-web-opt input[type=checkbox], .pstaff-opt input[type=checkbox] {
+            appearance: none; -webkit-appearance: none; margin: 0;
+            width: 18px; height: 18px; border-radius: 6px; flex: none;
+            border: 1.5px solid #c7c6f1; background: #fff; cursor: pointer;
+            position: relative; transition: all .15s;
+        }
+        .fweb-opt input[type=checkbox]:checked, .fsp-opt input[type=checkbox]:checked,
+        .seg-web-opt input[type=checkbox]:checked, .pstaff-opt input[type=checkbox]:checked {
+            background: #6f63e6; border-color: #6f63e6;
+        }
+        .fweb-opt input[type=checkbox]:checked::after, .fsp-opt input[type=checkbox]:checked::after,
+        .seg-web-opt input[type=checkbox]:checked::after, .pstaff-opt input[type=checkbox]:checked::after {
+            content: ''; position: absolute; left: 5.5px; top: 2px;
+            width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+        }
     </style>
 </head>
 <body>
@@ -1277,9 +1304,15 @@
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
                 <div class="seg-control" id="dashSeg">
                     <button data-period="month" onclick="setDashPeriod('month', this)">Tháng</button>
-                    <button data-period="week" onclick="setDashPeriod('week', this)">Tuần</button>
                     <button data-period="year" onclick="setDashPeriod('year', this)">Năm</button>
                     <button data-period="all" class="active" onclick="setDashPeriod('all', this)">Tất cả thời gian</button>
+                    <button data-period="custom" onclick="setDashPeriod('custom', this)">Tùy chọn</button>
+                </div>
+                <div id="dashCustomRange" style="display:none; gap:8px; align-items:center;">
+                    <input type="date" id="dashFrom" class="filter-select">
+                    <span style="color:var(--text-light);">→</span>
+                    <input type="date" id="dashTo" class="filter-select">
+                    <button class="btn btn-primary" onclick="applyDashboardFilter()">Lọc</button>
                 </div>
                 <div id="dashEmployeeWrap" class="section-hidden">
                     <select class="filter-select" id="dashEmployee" onchange="applyDashboardFilter()" style="min-width:170px;">
@@ -1287,16 +1320,14 @@
                     </select>
                 </div>
                 <div style="flex:1;"></div>
-                <button class="btn btn-primary">
+                <button class="btn btn-primary" onclick="exportDashboardExcel()">
                     <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                     Xuất Excel
                 </button>
-                <!-- Element ẩn giữ tương thích JS cũ (period/custom range) -->
+                <!-- Element ẩn giữ tương thích JS cũ (period) -->
                 <select id="dashPeriod" style="display:none;">
-                    <option value="all">Tất cả thời gian</option><option value="week">Tuần</option><option value="month">Tháng</option><option value="year">Năm</option><option value="custom">Tùy chọn</option>
+                    <option value="all">Tất cả thời gian</option><option value="month">Tháng</option><option value="year">Năm</option><option value="custom">Tùy chọn</option>
                 </select>
-                <input type="date" id="dashFrom" style="display:none;">
-                <input type="date" id="dashTo" style="display:none;">
             </div>
 
             <!-- Tổng quan panel -->
@@ -1375,7 +1406,7 @@
                         <div class="chart-header">
                             <div style="display:flex; flex-direction:column; gap:2px;">
                                 <h3 class="chart-title">Doanh thu theo thời gian</h3>
-                                <span style="font-size:12.5px; color:var(--text-light); font-weight:500;">6 tháng gần nhất · đơn vị tỷ đồng</span>
+                                <span id="revChartSub" style="font-size:12.5px; color:var(--text-light); font-weight:500;">6 tháng gần nhất · đơn vị tỷ đồng</span>
                             </div>
                             <span class="legend-pill"><span class="dot"></span>Doanh thu</span>
                         </div>
@@ -1566,7 +1597,7 @@
                 </div>
                 <div class="header-actions section-hidden" id="adminActions">
                     <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleExcelUpload(event)">
-                    <button class="btn btn-danger" onclick="resetData()" title="Xóa toàn bộ dữ liệu đã upload">
+                    <button class="btn btn-danger" onclick="openDeleteDataModal()" title="Xóa đơn hàng theo khoảng ngày">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
@@ -2497,13 +2528,15 @@
             const empSet = dashEmpStaffSet;
             const inRange = (ymd) => !range || (ymd >= range.from && ymd <= range.to);
 
-            // ===== Revenue line chart — luôn 6 tháng gần nhất, đơn vị tỷ (khớp thiết kế) =====
-            const rev = buildRevenue6Months();
+            // ===== Revenue line chart — theo filter thời gian, đơn vị tỷ =====
+            const rev = range ? buildDashRevenue(range) : buildRevenue6Months();
             if (revenueChart) {
                 revenueChart.data.labels = rev.labels;
                 revenueChart.data.datasets[0].data = rev.data;
                 revenueChart.update();
             }
+            const subEl = document.getElementById('revChartSub');
+            if (subEl) subEl.textContent = (range ? dashRevSubtitle() : '6 tháng gần nhất') + ' · đơn vị tỷ đồng';
 
             // ===== Segment (phân nhóm) + Top website — gom từ orders trong range (+ filter nhân viên) =====
             const segs = {};            // segment → { customers:Set, revenue }
@@ -2529,7 +2562,7 @@
                 }
             });
 
-            const segOrder = ['Sỉ vừa', 'Khách Lẻ', 'CTV', 'Sỉ to', 'Sỉ nhỏ'];
+            const segOrder = ['Khách Lẻ', 'CTV', 'Sỉ nhỏ', 'Sỉ vừa', 'Sỉ to'];
             const segNames = [...segOrder.filter(s => segs[s]), ...Object.keys(segs).filter(s => !segOrder.includes(s))];
             segmentData.labels = segNames;
             segmentData.data = segNames.map(s => segs[s].revenue);
@@ -2690,6 +2723,58 @@
             return { labels, data };
         }
 
+        // Doanh thu theo range chọn (đơn vị tỷ): span <=62 ngày -> theo ngày (2 chữ số), dài hơn -> theo tháng (1 chữ số)
+        function buildDashRevenue(range) {
+            const empSet = dashEmpStaffSet;
+            const dailyTotal = {};
+            allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                if (empSet && !empSet.has(o.employee)) return;
+                const ymd = parseDateToDay(o.date);
+                if (!ymd) return;
+                if (range && (ymd < range.from || ymd > range.to)) return;
+                dailyTotal[ymd] = (dailyTotal[ymd] || 0) + (o.amount || 0);
+            }));
+            const days = Object.keys(dailyTotal).sort();
+            if (!days.length) return { labels: [], data: [] };
+            const fromYmd = range ? range.from : days[0];
+            const toYmd = range ? range.to : days[days.length - 1];
+            const toDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+            const spanDays = (toDate(toYmd) - toDate(fromYmd)) / 86400000;
+            const labels = [], data = [];
+            const TY = 1e9;
+            if (spanDays <= 62) {
+                const cur = toDate(fromYmd), end = toDate(toYmd);
+                while (cur <= end) {
+                    const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+                    labels.push(`${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`);
+                    data.push(Math.round((dailyTotal[ymd] || 0) / TY * 100) / 100);
+                    cur.setDate(cur.getDate() + 1);
+                }
+            } else {
+                const monthTotal = {};
+                Object.entries(dailyTotal).forEach(([ymd, v]) => { const ym = ymd.slice(0, 7); monthTotal[ym] = (monthTotal[ym] || 0) + v; });
+                const cur = toDate(fromYmd.slice(0, 7) + '-01'), end = toDate(toYmd.slice(0, 7) + '-01');
+                while (cur <= end) {
+                    const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+                    labels.push(`T${cur.getMonth() + 1}/${String(cur.getFullYear()).slice(2)}`);
+                    data.push(Math.round((monthTotal[ym] || 0) / TY * 10) / 10);
+                    cur.setMonth(cur.getMonth() + 1);
+                }
+            }
+            return { labels, data };
+        }
+
+        // Mô tả khoảng thời gian cho subtitle chart doanh thu
+        function dashRevSubtitle() {
+            const period = document.getElementById('dashPeriod')?.value || 'all';
+            const r = dashboardRange;
+            if (period === 'month' && r) { const [y, m] = r.from.split('-'); return `Tháng ${parseInt(m, 10)}/${y}`; }
+            if (period === 'year' && r) return `Năm ${r.from.split('-')[0]}`;
+            if (period === 'week') return '7 ngày gần nhất';
+            if (period === 'custom' && r) return `${r.from} → ${r.to}`;
+            return '6 tháng gần nhất';
+        }
+
         // Chart 1: Doanh thu theo thời gian (Line Chart)
         // Init với data rỗng, sẽ được update bởi refreshRevenueChart() sau khi allCustomers ready
         let revenueChart;
@@ -2786,7 +2871,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: { display: false },
+                            ticks: { display: true, color: '#9aa08e', font: { weight: 600, size: 11 }, maxTicksLimit: 5, padding: 6, callback: function (v) { return v + ' tỷ'; } },
                             border: { display: false },
                             grid: { color: '#eef0e6' }
                         },
@@ -3065,6 +3150,44 @@
                 await refreshAll();
             } catch (err) {
                 showToast('error', 'Lỗi xóa data', err.message);
+            }
+        }
+
+        // ===== Modal xóa dữ liệu đơn theo khoảng ngày =====
+        function openDeleteDataModal() {
+            const f = document.getElementById('delFrom'), t = document.getElementById('delTo');
+            if (f) f.value = '';
+            if (t) t.value = '';
+            document.getElementById('deleteDataModal').classList.add('active');
+        }
+        function closeDeleteDataModal() {
+            document.getElementById('deleteDataModal').classList.remove('active');
+        }
+        async function confirmDeleteData() {
+            const from = document.getElementById('delFrom').value;
+            const to = document.getElementById('delTo').value;
+            if (from && to && from > to) { showToast('error', 'Ngày không hợp lệ', 'Từ ngày phải trước Đến ngày'); return; }
+            let url = '/api/orders', msg;
+            if (!from && !to) {
+                if (!confirm('Xóa TOÀN BỘ đơn hàng & khách hàng? Không thể hoàn tác.')) return;
+                msg = 'Đã xóa toàn bộ dữ liệu';
+            } else {
+                const qs = new URLSearchParams();
+                if (from) qs.set('from', from);
+                if (to) qs.set('to', to);
+                url += '?' + qs.toString();
+                msg = 'Đã xóa đơn trong khoảng đã chọn';
+            }
+            try {
+                const r = await apiDelete(url);
+                closeDeleteDataModal();
+                const n = (r && typeof r.deleted === 'number') ? ` (${r.deleted.toLocaleString('vi-VN')} đơn)` : '';
+                showToast('success', 'Đã xóa', msg + n);
+                await loadCustomersFromAPI();
+                await refreshAll();
+                if (!document.getElementById('orders-view').classList.contains('section-hidden')) loadOrders(1);
+            } catch (err) {
+                showToast('error', 'Lỗi xóa', err.message);
             }
         }
 
@@ -3437,6 +3560,47 @@
             const filename = `Deki_KhachHang_${new Date().toISOString().slice(0, 10)}.xlsx`;
             XLSX.writeFile(wb, filename);
             showToast('success', 'Xuất file thành công', `Đã tải ${data.length} khách hàng`);
+        }
+
+        // Xuất Excel ĐƠN HÀNG theo filter nhân viên + thời gian hiện tại của Dashboard.
+        // Non-admin: allCustomers đã được server scope theo tên nhân viên của họ -> chỉ ra đơn của họ.
+        // Admin: chọn 1 nhân viên (dashEmpStaffSet) hoặc "Tất cả nhân viên" (null).
+        function exportDashboardExcel() {
+            if (typeof XLSX === 'undefined') { showToast('error', 'Lỗi', 'Thư viện Excel chưa sẵn sàng'); return; }
+            try {
+                const empSet = dashEmpStaffSet;   // null = tất cả nhân viên
+                const range = dashboardRange;     // null = tất cả thời gian
+                const list = [];
+                allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                    if (empSet && !empSet.has(o.employee)) return;
+                    const ymd = parseDateToDay(o.date);
+                    if (range && (!ymd || ymd < range.from || ymd > range.to)) return;
+                    list.push({ c, o, ymd: ymd || '' });
+                }));
+                if (!list.length) { showToast('error', 'Không có dữ liệu', 'Không có đơn hàng phù hợp bộ lọc'); return; }
+                list.sort((a, b) => (a.ymd < b.ymd ? 1 : a.ymd > b.ymd ? -1 : 0)); // mới nhất trước
+                const rows = list.map(({ c, o }) => ({
+                    'Thời gian': o.date || '',
+                    'Mã đơn': o.code || '',
+                    'Khách hàng': c.name || '',
+                    'SĐT': c.phone || '',
+                    'Brand': o.brand || '',
+                    'Phân nhóm': c.segment || '',
+                    'Nhân viên': o.employee || '',
+                    'Website': o.website ? webName(o.website) : '',
+                    'Thành tiền': o.amount || 0
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Đơn hàng');
+                const empEl = document.getElementById('dashEmployee');
+                const empName = (empEl && empEl.value) ? empEl.value : 'TatCa';
+                const safe = empName.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '') || 'TatCa';
+                XLSX.writeFile(wb, `Deki_DonHang_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                showToast('success', 'Xuất file thành công', `Đã tải ${rows.length.toLocaleString('vi-VN')} đơn`);
+            } catch (e) {
+                showToast('error', 'Lỗi xuất Excel', e.message);
+            }
         }
 
         // Apply filters
@@ -4211,7 +4375,10 @@
             const sel = document.getElementById('dashPeriod');
             if (sel) sel.value = period;
             document.querySelectorAll('#dashSeg button').forEach(b => b.classList.toggle('active', b === btn));
-            applyDashboardFilter();
+            const cr = document.getElementById('dashCustomRange');
+            if (cr) cr.style.display = (period === 'custom') ? 'flex' : 'none';
+            // "Tùy chọn": đợi user chọn ngày rồi bấm Lọc; còn lại áp ngay
+            if (period !== 'custom') applyDashboardFilter();
         }
 
         // Cập nhật user pill ở header (tên + initials) theo tài khoản đăng nhập
@@ -5428,15 +5595,23 @@
 
             // Nhãn so sánh động theo kỳ
             const cmpLabel = period === 'year' ? 'so với năm trước'
-                : period === 'week' ? 'so với tuần trước' : 'so với tháng trước';
+                : period === 'custom' ? 'so với kỳ trước' : 'so với tháng trước';
             document.querySelectorAll('.stat-cmp').forEach(el => el.textContent = cmpLabel);
         }
 
         // Tính range kỳ liền trước để so sánh trend
         function dashPrevRange(period, range) {
-            if (!range || !period || period === 'all' || period === 'custom') return null;
+            if (!range || !period || period === 'all') return null;
             const toYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             const [fy, fm, fd] = range.from.split('-').map(Number);
+            if (period === 'custom') {
+                const [ty, tm, td] = range.to.split('-').map(Number);
+                const f = new Date(fy, fm - 1, fd), t = new Date(ty, tm - 1, td);
+                const lenDays = Math.round((t - f) / 86400000) + 1;
+                const prevTo = new Date(f); prevTo.setDate(prevTo.getDate() - 1);
+                const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - (lenDays - 1));
+                return { from: toYMD(prevFrom), to: toYMD(prevTo) };
+            }
             if (period === 'month') {
                 const first = new Date(fy, fm - 2, 1);
                 const last = new Date(fy, fm - 1, 0);   // ngày cuối tháng trước
@@ -5754,6 +5929,32 @@
     </div>
 
     <!-- Follow khách: Add/Edit modal -->
+    <!-- Modal: Xóa dữ liệu đơn theo khoảng ngày -->
+    <div class="modal-overlay" id="deleteDataModal">
+        <div class="modal-content" style="max-width: 460px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Xóa dữ liệu đơn hàng</h2>
+                <button class="modal-close" onclick="closeDeleteDataModal()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:13.5px; color:#5f655a; line-height:1.5; margin-bottom:16px;">
+                    Xóa đơn hàng theo <b>ngày đặt</b> trong khoảng chọn. Khách hàng không còn đơn nào sẽ bị xóa theo. <b style="color:#c0432f;">Không thể hoàn tác.</b>
+                </p>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                    <div><label class="cv-lbl">Từ ngày</label><input type="date" id="delFrom" class="filter-select" style="width:100%"></div>
+                    <div><label class="cv-lbl">Đến ngày</label><input type="date" id="delTo" class="filter-select" style="width:100%"></div>
+                </div>
+                <p style="font-size:12px; color:#9aa08e; margin:10px 0 18px;">Để trống cả hai ô = xóa <b>toàn bộ</b> dữ liệu.</p>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-secondary" onclick="closeDeleteDataModal()">Hủy</button>
+                    <button class="btn btn-danger" onclick="confirmDeleteData()">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="followModal">
         <div class="modal-content" style="max-width: 640px;">
             <div class="modal-header">
