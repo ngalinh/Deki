@@ -2153,11 +2153,14 @@
             if (viewName === 'congviec') loadCongViec();
             if (viewName === 'orders') initOrdersView();
 
-            // Update active nav
+            // Update active nav (an toàn cả khi gọi không qua click event — vd deep-link ?view=)
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.closest('.nav-item').classList.add('active');
+            const navEl = (typeof event !== 'undefined' && event && event.target)
+                ? event.target.closest('.nav-item')
+                : document.querySelector(`.nav-item[onclick*="showView('${viewName}')"]`);
+            navEl?.classList.add('active');
         }
 
         let currentModalCustomer = null;
@@ -5706,6 +5709,13 @@
             document.getElementById('employeeFilter')?.addEventListener('change', applyFilters);
 
             initCursorRipple();
+
+            // Deep-link: mở thẳng 1 view qua ?view=... (vd Zalo CRM mở Deki vào Công việc/Follow khách).
+            const viewParam = new URL(location.href).searchParams.get('view');
+            const allowedViews = ['dashboard', 'congviec', 'customers', 'orders', 'reports', 'filters', 'admin'];
+            if (viewParam && allowedViews.includes(viewParam) && document.getElementById(viewParam + '-view')) {
+                showView(viewParam);
+            }
         });
 
         // Hiệu ứng vũng nước: rê chuột → gợn sóng đơn lan+mờ; click → bung gợn sóng kép lớn hơn (giống folder)
