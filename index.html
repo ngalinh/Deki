@@ -1196,6 +1196,22 @@
             content: ''; position: absolute; left: 5.5px; top: 2px;
             width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
         }
+
+        /* Modal chi tiết khách hàng — layout 2 cột (khớp folder) */
+        .modal-content.cd-modal {
+            width: 880px; max-width: 96vw; max-height: 90vh; padding: 0; overflow: hidden;
+            display: flex; flex-direction: column; position: relative; border-radius: 24px;
+            background: radial-gradient(110% 90% at 100% 6%, rgba(189,203,158,.18) 0%, rgba(189,203,158,0) 55%), radial-gradient(130% 110% at 6% 0%, #f3f5ec 0%, #ecf0e1 55%, #e5ebd6 100%);
+        }
+        .cd-stat { display: flex; align-items: center; gap: 11px; background: #fcfcf8; border: 1px solid #eef0e6; border-radius: 13px; padding: 11px 13px; transition: background .12s; }
+        .cd-stat[onclick]:hover { background: #f4f5ec; cursor: pointer; }
+        .cd-stat-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: none; }
+        .cd-stat-v { font-size: 18px; font-weight: 800; line-height: 1.1; }
+        .cd-stat-l { font-size: 11.5px; color: #6b7163; font-weight: 600; }
+        @media (max-width: 768px) {
+            .cd-body { flex-direction: column; }
+            .cd-left { width: auto !important; border-right: none !important; border-bottom: 1px solid rgba(225,229,210,.7); }
+        }
     </style>
 </head>
 <body>
@@ -2173,37 +2189,34 @@
 
             currentModalCustomer = customer;
 
-            // Populate header
+            // Avatar initials
+            const nm = String(customer.name || '').trim();
+            const parts = nm.split(/\s+/).filter(Boolean);
+            const initials = (parts.length >= 2 ? parts[parts.length - 2][0] + parts[parts.length - 1][0] : nm.slice(0, 2)).toUpperCase();
+            document.getElementById('cdAvatar').textContent = initials || '?';
             document.getElementById('modalCustomerName').textContent = customer.name;
 
             // Segment badge với màu tương ứng
             const segmentBadge = document.getElementById('modalSegment');
-            const segmentClass = removeDiacritics(customer.segment).toLowerCase().replace(/\s+/g, '-');
-            segmentBadge.textContent = customer.segment;
+            const segmentClass = removeDiacritics(customer.segment || '').toLowerCase().replace(/\s+/g, '-');
+            segmentBadge.textContent = customer.segment || '-';
             segmentBadge.className = 'badge ' + segmentClass;
 
-            // SĐT khách hàng
             document.getElementById('modalPhone').textContent = customer.phone || 'Chưa có';
-
-            // Nhân viên phụ trách (filter bỏ EXCLUDED_EMPLOYEES)
             const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
             document.getElementById('modalEmployees').textContent = employees.length > 0 ? employees.join(', ') : 'Chưa có';
 
-            // Populate month filter dropdown từ monthlyData
-            const monthFilter = document.getElementById('modalMonthFilter');
-            const months = Object.keys(customer.monthlyData || {}).sort().reverse();
-            monthFilter.innerHTML = '<option value="all">Tất cả thời gian</option>' +
-                months.map(m => {
-                    const [y, mm] = m.split('-');
-                    return `<option value="${m}">Tháng ${parseInt(mm)}/${y}</option>`;
-                }).join('');
-            monthFilter.value = 'all';
+            // Reset toggle kỳ về "Tất cả" + ẩn khung ngày tùy chọn
+            document.querySelectorAll('#cdPeriodSeg button').forEach(b => b.classList.toggle('active', b.dataset.cdp === 'all'));
+            const cdcr = document.getElementById('cdCustomRange');
+            if (cdcr) cdcr.style.display = 'none';
+            const cdf = document.getElementById('cdFrom'), cdt = document.getElementById('cdTo');
+            if (cdf) cdf.value = ''; if (cdt) cdt.value = '';
 
-            // Render stats + websites + orders theo filter mặc định (all)
-            renderModalStats();
-
-            // Show modal
+            renderModalStats();   // 4 thẻ số + website chips + đơn gần đây (tổng all-time)
             document.getElementById('customerModal').classList.add('active');
+            // Vẽ chart sau 1 frame để canvas có kích thước
+            requestAnimationFrame(() => { try { custChart && custChart.resize(); } catch (e) {} renderCustChart('all'); });
         }
 
         function closeCustomerModal() {
@@ -2404,103 +2417,163 @@
             }).join('');
         }
 
-        // Render stats trong modal theo filter tháng
+        // Render thẻ số (tổng all-time) + website chips + đơn gần đây cho modal chi tiết khách
         function renderModalStats() {
             const customer = currentModalCustomer;
             if (!customer) return;
 
-            const selected = document.getElementById('modalMonthFilter').value;
-            let orders, revenue, ordersTrend = null, revenueTrend = null;
-
-            if (selected === 'all') {
-                // Tổng tất cả
-                orders = customer.orders;
-                revenue = customer.revenue;
-            } else {
-                // Theo tháng cụ thể
-                const monthData = (customer.monthlyData || {})[selected] || { orders: 0, revenue: 0 };
-                orders = monthData.orders;
-                revenue = monthData.revenue;
-
-                // Tính tháng trước cho so sánh
-                const [y, m] = selected.split('-').map(Number);
-                const prevDate = new Date(y, m - 2, 1);
-                const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-                const prevData = (customer.monthlyData || {})[prevMonth];
-
-                if (prevData) {
-                    const pctChange = (curr, prev) => prev ? ((curr - prev) / prev) * 100 : 0;
-                    ordersTrend = pctChange(orders, prevData.orders);
-                    revenueTrend = pctChange(revenue, prevData.revenue);
-                }
-            }
-
+            const orders = customer.orders || 0;
+            const revenue = customer.revenue || 0;
             const avgOrder = orders > 0 ? revenue / orders : 0;
+            const websites = (customer.websites || []).filter(w => w && w !== 'N/A');
+            const unit = (u) => ` <span style="font-size:12px;color:#8c9281;">${u}</span>`;
 
-            // Tính websites + orders theo filter để hiển thị section dưới
-            const filteredOrders = getFilteredCustomerOrders(customer);
-            let websitesInPeriod;
-            if (selected === 'all') {
-                websitesInPeriod = (customer.websites || []).filter(w => w && w !== 'N/A');
-            } else {
-                const websiteSet = new Set();
-                filteredOrders.forEach(o => {
-                    if (o.website && o.website !== 'N/A') websiteSet.add(o.website);
-                });
-                websitesInPeriod = Array.from(websiteSet);
-            }
-
-            // Render values
             document.getElementById('modalOrders').textContent = orders.toLocaleString('vi-VN');
-            document.getElementById('modalRevenue').textContent = revenue >= 1e9
-                ? (revenue / 1e9).toFixed(2) + ' tỷ'
-                : (revenue / 1e6).toFixed(1) + ' triệu';
-            document.getElementById('modalAvgOrder').textContent = avgOrder > 0
-                ? (avgOrder / 1e6).toFixed(1) + 'M đ'
+            document.getElementById('modalRevenue').innerHTML = revenue >= 1e9
+                ? (revenue / 1e9).toFixed(2).replace('.', ',') + unit('tỷ')
+                : (revenue / 1e6).toFixed(1).replace('.', ',') + unit('tr');
+            document.getElementById('modalAvgOrder').innerHTML = avgOrder > 0
+                ? (avgOrder / 1e6).toFixed(1).replace('.', ',') + 'M' + unit('đ')
                 : '0';
-            document.getElementById('modalWebsites').textContent = websitesInPeriod.length;
+            document.getElementById('modalWebsites').textContent = websites.length;
+            const ot = document.getElementById('cdOrderTotal');
+            if (ot) ot.textContent = orders.toLocaleString('vi-VN');
 
-            // Render trends (chỉ khi có data tháng trước)
-            document.getElementById('modalOrdersTrend').innerHTML = renderTrend(ordersTrend);
-            document.getElementById('modalRevenueTrend').innerHTML = renderTrend(revenueTrend);
+            // Website chips: 10 đầu + "+N website"
+            const wl = document.getElementById('modalWebsiteList');
+            const shown = websites.slice(0, 10);
+            let chips = shown.map(w => `<span style="background:#f2f3e8; color:#5f655a; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:600;">${webName(w)}</span>`).join('');
+            const more = websites.length - shown.length;
+            if (more > 0) chips += `<span style="background:#f1f1fe; color:#6155cf; border:1px solid #c7c6f1; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:700;">+${more} website</span>`;
+            wl.innerHTML = chips || '<span style="color:var(--text-light); font-size:12.5px;">Chưa có website</span>';
 
-            // Render Website chips (10 đầu tiên)
-            const websiteList = document.getElementById('modalWebsiteList');
-            websiteList.innerHTML = websitesInPeriod.slice(0, 10).map(website => `
-                <div class="website-chip">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                    </svg>
-                    ${webName(website)}
-                </div>
-            `).join('');
-
-            // Render Đơn hàng gần đây (4 đơn mới nhất theo filter)
+            // Đơn hàng gần đây (5 mới nhất, all-time)
             const orderList = document.getElementById('modalOrderList');
-            const sortedOrders = [...filteredOrders].sort((a, b) => {
-                const da = parseDateToDay(a.date) || '';
-                const db = parseDateToDay(b.date) || '';
+            const sorted = [...(customer.allOrders || [])].sort((a, b) => {
+                const da = parseDateToDay(a.date) || '', db = parseDateToDay(b.date) || '';
                 return db.localeCompare(da);
             });
-            const recentOrders = sortedOrders.slice(0, 4);
-
-            if (recentOrders.length === 0) {
-                orderList.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-light);">Không có đơn hàng trong khoảng thời gian này</div>';
+            const recent = sorted.slice(0, 5);
+            if (!recent.length) {
+                orderList.innerHTML = '<div style="text-align:center; padding:24px; color:var(--text-light); font-size:13px;">Chưa có đơn hàng</div>';
             } else {
-                orderList.innerHTML = recentOrders.map(order => `
-                    <div class="order-item">
-                        <span class="order-code">${order.code ? `<a href="#" onclick="openBassoOrder('${String(order.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${order.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${order.code}</a>` : '-'}</span>
-                        <div class="order-info">
-                            <div>${order.website || '-'}</div>
-                            <div class="order-date">${order.date || '-'}</div>
+                orderList.innerHTML = recent.map((o, i) => {
+                    const brandClass = o.brand ? removeDiacritics(o.brand).toLowerCase().replace(/\s+/g, '-') : '';
+                    const border = i < recent.length - 1 ? 'border-bottom:1px solid #f2f3ec;' : '';
+                    const codeHtml = o.code ? `<a href="#" onclick="openBassoOrder('${String(o.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${o.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${o.code}</a>` : '-';
+                    return `<div style="display:flex; flex-direction:column; gap:5px; padding:13px 16px; ${border}">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                            <span style="font:700 13px 'Plus Jakarta Sans'; color:#6155cf;">${codeHtml}</span>
+                            <span style="font-weight:800; font-size:13.5px; white-space:nowrap;">${(o.amount || 0).toLocaleString('vi-VN')} đ</span>
                         </div>
-                        <span class="order-amount">${order.amount.toLocaleString('vi-VN')} đ</span>
-                        <span class="badge khach-le" style="font-size: 12px;">${order.brand || 'Hoàn thành'}</span>
-                    </div>
-                `).join('');
+                        <div style="display:flex; align-items:center; gap:9px; font-size:11.5px; color:#9aa08e;">
+                            <span style="flex:1; min-width:0; color:#5f655a; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${o.website ? webName(o.website) : '-'}</span>
+                            <span style="white-space:nowrap;">${o.date || '-'}</span>
+                            ${o.brand ? `<span class="badge ${brandClass}" style="font-size:10px; padding:2px 9px;">${o.brand}</span>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
             }
+        }
+
+        // ===== Chart doanh thu trong modal khách (Chart.js) =====
+        let custChart = null;
+        // Series doanh thu của 1 khách (đơn vị tỷ) theo kỳ: 6m (6 tháng), year (theo năm), all (mọi tháng)
+        function buildCustRevenue(customer, period) {
+            const md = customer.monthlyData || {};
+            const r2 = (n) => Math.round((n || 0) / 1e9 * 100) / 100;
+            if (period === 'custom') {
+                const from = document.getElementById('cdFrom')?.value;
+                const to = document.getElementById('cdTo')?.value;
+                if (!from || !to) return { labels: [], data: [], sub: 'Chọn khoảng ngày · đơn vị tỷ đồng' };
+                const dailyTotal = {};
+                (customer.allOrders || []).forEach(o => {
+                    const ymd = parseDateToDay(o.date);
+                    if (!ymd || ymd < from || ymd > to) return;
+                    dailyTotal[ymd] = (dailyTotal[ymd] || 0) + (o.amount || 0);
+                });
+                const toDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+                const spanDays = (toDate(to) - toDate(from)) / 86400000;
+                const labels = [], data = [];
+                if (spanDays <= 62) {
+                    const cur = toDate(from), end = toDate(to);
+                    while (cur <= end) {
+                        const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+                        labels.push(`${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`);
+                        data.push(r2(dailyTotal[ymd] || 0));
+                        cur.setDate(cur.getDate() + 1);
+                    }
+                } else {
+                    const mt = {};
+                    Object.entries(dailyTotal).forEach(([ymd, v]) => { const ym = ymd.slice(0, 7); mt[ym] = (mt[ym] || 0) + v; });
+                    const cur = toDate(from.slice(0, 7) + '-01'), end = toDate(to.slice(0, 7) + '-01');
+                    while (cur <= end) {
+                        const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+                        labels.push(`T${cur.getMonth() + 1}/${String(cur.getFullYear()).slice(2)}`);
+                        data.push(r2(mt[ym] || 0));
+                        cur.setMonth(cur.getMonth() + 1);
+                    }
+                }
+                return { labels, data, sub: `${from} → ${to} · đơn vị tỷ đồng` };
+            }
+            if (period === 'year') {
+                const yt = {};
+                Object.entries(md).forEach(([ym, v]) => { const y = ym.slice(0, 4); yt[y] = (yt[y] || 0) + (v.revenue || 0); });
+                const ys = Object.keys(yt).sort();
+                return { labels: ys, data: ys.map(y => r2(yt[y])), sub: 'Theo năm · đơn vị tỷ đồng' };
+            }
+            const ms = Object.keys(md).sort();
+            const use = (period === '6m') ? ms.slice(-6) : ms;
+            return {
+                labels: use.map(ym => { const [y, m] = ym.split('-'); return `T${parseInt(m, 10)}/${y.slice(2)}`; }),
+                data: use.map(ym => r2(md[ym].revenue)),
+                sub: (period === '6m' ? '6 tháng gần nhất' : 'Tất cả thời gian') + ' · đơn vị tỷ đồng'
+            };
+        }
+        function renderCustChart(period) {
+            const c = currentModalCustomer;
+            if (!c) return;
+            const s = buildCustRevenue(c, period);
+            const subEl = document.getElementById('cdChartSub');
+            if (subEl) subEl.textContent = s.sub;
+            const ctx = document.getElementById('custChart');
+            if (!ctx || typeof Chart === 'undefined') return;
+            if (!custChart) {
+                custChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [{
+                        data: [], borderColor: '#23b3aa', borderWidth: 3, tension: 0.45, fill: true,
+                        pointRadius: 4, pointHoverRadius: 7, pointBackgroundColor: '#fff', pointBorderColor: '#23b3aa', pointBorderWidth: 2,
+                        backgroundColor: function (cc) {
+                            const { chart } = cc; const { ctx: cx, chartArea } = chart;
+                            if (!chartArea) return 'rgba(35,179,170,0.18)';
+                            const g = cx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                            g.addColorStop(0, 'rgba(35,179,170,0.28)'); g.addColorStop(1, 'rgba(35,179,170,0)');
+                            return g;
+                        }
+                    }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { backgroundColor: '#25271f', padding: 10, titleColor: '#23b3aa', bodyColor: '#fff', displayColors: false, callbacks: { label: (c3) => c3.parsed.y.toLocaleString('vi-VN') + ' tỷ' } }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { display: true, color: '#9aa08e', font: { weight: 600, size: 11 }, maxTicksLimit: 5, padding: 6, callback: (v) => v + ' tỷ' }, border: { display: false }, grid: { color: '#eef0e6' } },
+                            x: { ticks: { color: '#9aa08e', font: { weight: 600, size: 11 } }, border: { display: false }, grid: { display: false } }
+                        }
+                    }
+                });
+            }
+            custChart.data.labels = s.labels;
+            custChart.data.datasets[0].data = s.data;
+            custChart.update();
+        }
+        function setCustPeriod(period, btn) {
+            document.querySelectorAll('#cdPeriodSeg button').forEach(b => b.classList.toggle('active', b === btn));
+            const cr = document.getElementById('cdCustomRange');
+            if (cr) cr.style.display = (period === 'custom') ? 'flex' : 'none';
+            renderCustChart(period); // 'custom' chưa chọn ngày -> chart rỗng + nhắc chọn; bấm Lọc để vẽ
         }
 
         // Close modal khi click NỀN (overlay). Chỉ đóng nếu chuột BẮT ĐẦU bấm trên chính overlay đó
@@ -2531,15 +2604,15 @@
             const empSet = dashEmpStaffSet;
             const inRange = (ymd) => !range || (ymd >= range.from && ymd <= range.to);
 
-            // ===== Revenue line chart — theo filter thời gian, đơn vị tỷ =====
-            const rev = range ? buildDashRevenue(range) : buildRevenue6Months();
+            // ===== Revenue line chart — theo filter thời gian (range null = toàn bộ tháng), đơn vị tỷ =====
+            const rev = buildDashRevenue(range);
             if (revenueChart) {
                 revenueChart.data.labels = rev.labels;
                 revenueChart.data.datasets[0].data = rev.data;
                 revenueChart.update();
             }
             const subEl = document.getElementById('revChartSub');
-            if (subEl) subEl.textContent = (range ? dashRevSubtitle() : '6 tháng gần nhất') + ' · đơn vị tỷ đồng';
+            if (subEl) subEl.textContent = dashRevSubtitle() + ' · đơn vị tỷ đồng';
 
             // ===== Segment (phân nhóm) + Top website — gom từ orders trong range (+ filter nhân viên) =====
             const segs = {};            // segment → { customers:Set, revenue }
@@ -2775,7 +2848,7 @@
             if (period === 'year' && r) return `Năm ${r.from.split('-')[0]}`;
             if (period === 'week') return '7 ngày gần nhất';
             if (period === 'custom' && r) return `${r.from} → ${r.to}`;
-            return '6 tháng gần nhất';
+            return 'Tất cả thời gian';
         }
 
         // Chart 1: Doanh thu theo thời gian (Line Chart)
@@ -5761,139 +5834,89 @@
 
     <!-- Customer Detail Modal -->
     <div class="modal-overlay" id="customerModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <h2 class="modal-title" id="modalCustomerName">Chi tiết khách hàng</h2>
-                        <span class="badge" id="modalSegment">-</span>
-                    </div>
-                    <div style="font-size: 13px; color: var(--text-gray); margin-top: 6px; display: flex; gap: 20px; flex-wrap: wrap;">
-                        <span>SĐT: <span id="modalPhone" style="color: var(--primary); font-weight: 500;">-</span></span>
-                        <span>Nhân viên phụ trách: <span id="modalEmployees" style="color: var(--text-dark); font-weight: 500;">-</span></span>
-                    </div>
-                </div>
-                <button class="modal-close" onclick="closeCustomerModal()">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- Filter theo tháng -->
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 12px 16px; background: var(--bg-main); border-radius: 8px;">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-gray);">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <label style="font-weight: 500; color: var(--text-dark);">Xem doanh thu theo:</label>
-                    <select class="filter-select" id="modalMonthFilter" style="flex: 1; max-width: 250px;" onchange="renderModalStats()">
-                        <option value="all">Tất cả thời gian</option>
-                    </select>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card" onclick="showAllOrdersModal()" style="cursor: pointer;" title="Click để xem chi tiết tất cả đơn hàng">
-                        <div class="stat-header">
-                            <div>
-                                <div class="stat-value" id="modalOrders">0</div>
-                                <div class="stat-label" style="display: flex; align-items: center; gap: 4px;">
-                                    Tổng đơn hàng
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </div>
-                                <div id="modalOrdersTrend"></div>
-                            </div>
-                            <div class="stat-icon success">
-                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="9" cy="21" r="1"></circle>
-                                    <circle cx="20" cy="21" r="1"></circle>
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                                </svg>
-                            </div>
+        <div class="modal-content cd-modal">
+            <button class="modal-close" onclick="closeCustomerModal()" style="position:absolute; top:16px; right:18px; z-index:6; background:#f1f2e8; border:1px solid #e7e9dc; color:#5f655a;">
+                <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <div class="cd-body" style="flex:1; overflow-y:auto; display:flex; align-items:stretch;">
+                <!-- CỘT TRÁI -->
+                <div class="cd-left" style="width:300px; flex:0 0 auto; padding:22px; display:flex; flex-direction:column; gap:18px; border-right:1px solid rgba(225,229,210,.7);">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:11px; text-align:center;">
+                        <div id="cdAvatar" style="width:66px; height:66px; border-radius:999px; background:#e4e2fb; color:#6155cf; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px;"></div>
+                        <div style="display:flex; flex-direction:column; gap:7px; align-items:center;">
+                            <span id="modalCustomerName" style="font-size:18px; font-weight:800; letter-spacing:-.01em;">Chi tiết khách hàng</span>
+                            <span class="badge" id="modalSegment">-</span>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div>
-                                <div class="stat-value" id="modalRevenue">0</div>
-                                <div class="stat-label">Tổng doanh thu</div>
-                                <div id="modalRevenueTrend"></div>
-                            </div>
-                            <div class="stat-icon warning">
-                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                </svg>
-                            </div>
+                    <div style="background:#fcfcf8; border:1px solid #eef0e6; border-radius:14px; padding:13px 15px; display:flex; flex-direction:column; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:#5f655a;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa08e" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            SĐT <b id="modalPhone" style="color:#25271f;">-</b>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:#5f655a;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa08e" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                            NV phụ trách <b id="modalEmployees" style="color:#25271f;">-</b>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div>
-                                <div class="stat-value" id="modalAvgOrder">0</div>
-                                <div class="stat-label">Giá trị TB/Đơn</div>
-                            </div>
-                            <div class="stat-icon primary">
-                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <line x1="12" y1="20" x2="12" y2="10"></line>
-                                    <line x1="18" y1="20" x2="18" y2="4"></line>
-                                    <line x1="6" y1="20" x2="6" y2="16"></line>
-                                </svg>
-                            </div>
+                    <div style="display:flex; flex-direction:column; gap:9px;">
+                        <div class="cd-stat" onclick="showAllOrdersModal()">
+                            <span class="cd-stat-ic" style="background:#f1f1fe; color:#6155cf;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                            <div style="display:flex; flex-direction:column;"><span id="modalOrders" class="cd-stat-v">0</span><span class="cd-stat-l">Tổng đơn hàng</span></div>
+                        </div>
+                        <div class="cd-stat">
+                            <span class="cd-stat-ic" style="background:#e6f6f2; color:#1e9a91;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+                            <div style="display:flex; flex-direction:column;"><span id="modalRevenue" class="cd-stat-v">0</span><span class="cd-stat-l">Tổng doanh thu</span></div>
+                        </div>
+                        <div class="cd-stat">
+                            <span class="cd-stat-ic" style="background:#faeed3; color:#a9761c;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                            <div style="display:flex; flex-direction:column;"><span id="modalAvgOrder" class="cd-stat-v">0</span><span class="cd-stat-l">Giá trị TB/Đơn</span></div>
+                        </div>
+                        <div class="cd-stat" onclick="showAllWebsitesModal()">
+                            <span class="cd-stat-ic" style="background:#ddf4e5; color:#2f8f54;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+                            <div style="display:flex; flex-direction:column;"><span id="modalWebsites" class="cd-stat-v">0</span><span class="cd-stat-l">Websites quan tâm</span></div>
                         </div>
                     </div>
-                    <div class="stat-card" onclick="showAllWebsitesModal()" style="cursor: pointer;" title="Click để xem chi tiết tất cả websites">
-                        <div class="stat-header">
-                            <div>
-                                <div class="stat-value" id="modalWebsites">0</div>
-                                <div class="stat-label" style="display: flex; align-items: center; gap: 4px;">
-                                    Websites quan tâm
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="stat-icon secondary">
-                                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                                </svg>
-                            </div>
-                        </div>
+                    <div style="display:flex; flex-direction:column; gap:9px;">
+                        <span style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:700;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c8270" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website quan tâm</span>
+                        <div id="modalWebsiteList" style="background:#fcfcf8; border:1px solid #eef0e6; border-radius:16px; padding:13px; display:flex; flex-wrap:wrap; gap:6px;"></div>
                     </div>
                 </div>
-
-                <!-- Website quan tâm -->
-                <h3 class="section-title">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                    </svg>
-                    Website quan tâm
-                </h3>
-                <div class="website-chips" id="modalWebsiteList">
-                    <!-- Dynamic content -->
-                </div>
-
-                <!-- Đơn hàng gần đây -->
-                <h3 class="section-title">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    Đơn hàng gần đây
-                </h3>
-                <div class="order-list" id="modalOrderList">
-                    <!-- Dynamic content -->
+                <!-- CỘT PHẢI -->
+                <div style="flex:1; min-width:0; padding:22px; display:flex; flex-direction:column; gap:18px;">
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <span style="font-size:12.5px; font-weight:600; color:#7c8270;">Xem doanh thu theo:</span>
+                        <div class="seg-control" id="cdPeriodSeg">
+                            <button data-cdp="6m" onclick="setCustPeriod('6m', this)">6 tháng</button>
+                            <button data-cdp="year" onclick="setCustPeriod('year', this)">Năm</button>
+                            <button data-cdp="all" class="active" onclick="setCustPeriod('all', this)">Tất cả</button>
+                            <button data-cdp="custom" onclick="setCustPeriod('custom', this)">Tùy chọn</button>
+                        </div>
+                        <div id="cdCustomRange" style="display:none; align-items:center; gap:8px;">
+                            <input type="date" id="cdFrom" class="filter-select" style="padding:7px 10px;">
+                            <span style="color:var(--text-light);">→</span>
+                            <input type="date" id="cdTo" class="filter-select" style="padding:7px 10px;">
+                            <button class="btn btn-primary" style="padding:8px 16px;" onclick="renderCustChart('custom')">Lọc</button>
+                        </div>
+                    </div>
+                    <div style="background:linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.26)); border:1px solid rgba(255,255,255,.55); border-radius:20px; padding:18px; display:flex; flex-direction:column; gap:14px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                <span style="display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8270" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>Doanh thu theo thời gian</span>
+                                <span id="cdChartSub" style="font-size:12px; color:#9aa08e; font-weight:500;"></span>
+                            </div>
+                            <span class="legend-pill"><span class="dot"></span>Doanh thu</span>
+                        </div>
+                        <div style="background:#fcfcf8; border:1px solid #eef0e6; border-radius:16px; padding:14px 12px 8px; box-shadow:0 4px 14px -10px rgba(45,55,40,.22);">
+                            <canvas id="custChart" style="max-height:240px;"></canvas>
+                        </div>
+                    </div>
+                    <div style="background:linear-gradient(160deg, rgba(255,255,255,.5), rgba(255,255,255,.26)); border:1px solid rgba(255,255,255,.55); border-radius:20px; padding:18px; display:flex; flex-direction:column; gap:12px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between;">
+                            <span style="display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8270" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Đơn hàng gần đây</span>
+                            <button onclick="showAllOrdersModal()" style="display:inline-flex; align-items:center; gap:5px; background:none; border:none; color:#6155cf; font:700 12.5px 'Plus Jakarta Sans'; cursor:pointer;">Xem tất cả <span id="cdOrderTotal">0</span> đơn<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                        </div>
+                        <div id="modalOrderList" style="display:flex; flex-direction:column; background:#fcfcf8; border:1px solid #eef0e6; border-radius:16px; overflow:hidden;"></div>
+                    </div>
                 </div>
             </div>
         </div>
