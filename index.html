@@ -1199,7 +1199,7 @@
 
         /* Modal chi tiết khách hàng — layout 2 cột (khớp folder) */
         .modal-content.cd-modal {
-            width: 880px; max-width: 96vw; max-height: 90vh; padding: 0; overflow: hidden;
+            width: 880px; max-width: 96vw; height: min(90vh, 720px); max-height: 90vh; padding: 0; overflow: hidden;
             display: flex; flex-direction: column; position: relative; border-radius: 24px;
             background: radial-gradient(110% 90% at 100% 6%, rgba(189,203,158,.18) 0%, rgba(189,203,158,0) 55%), radial-gradient(130% 110% at 6% 0%, #f3f5ec 0%, #ecf0e1 55%, #e5ebd6 100%);
         }
@@ -2206,7 +2206,8 @@
             const employees = (customer.employees || []).filter(e => !EXCLUDED_EMPLOYEES.includes(e.toLowerCase()));
             document.getElementById('modalEmployees').textContent = employees.length > 0 ? employees.join(', ') : 'Chưa có';
 
-            // Reset toggle kỳ về "Tất cả" + ẩn khung ngày tùy chọn
+            // Reset bộ lọc website + toggle kỳ về "Tất cả" + ẩn khung ngày tùy chọn
+            custWebFilter = null; custPeriod = 'all';
             document.querySelectorAll('#cdPeriodSeg button').forEach(b => b.classList.toggle('active', b.dataset.cdp === 'all'));
             const cdcr = document.getElementById('cdCustomRange');
             if (cdcr) cdcr.style.display = 'none';
@@ -2223,10 +2224,11 @@
             document.getElementById('customerModal').classList.remove('active');
         }
 
-        // Filter allOrders theo tháng được chọn trong modal customer
+        // Filter allOrders theo lọc website (custWebFilter) + tháng (nếu có) trong modal customer
         function getFilteredCustomerOrders(customer) {
             const selectedMonth = document.getElementById('modalMonthFilter')?.value || 'all';
-            const orders = customer.allOrders || [];
+            let orders = customer.allOrders || [];
+            if (custWebFilter) orders = orders.filter(o => o.website === custWebFilter);
             if (selectedMonth === 'all') return orders;
             return orders.filter(o => {
                 const dayKey = parseDateToDay(o.date);
@@ -2363,7 +2365,8 @@
             const customer = currentModalCustomer;
             if (!customer) return;
 
-            const filteredOrders = getFilteredCustomerOrders(customer);
+            // Liệt kê TẤT CẢ website (không áp custWebFilter) để xem doanh thu từng website
+            const filteredOrders = customer.allOrders || [];
 
             // Tính websites từ filtered orders (chỉ websites có order trong tháng đã chọn)
             const websiteStats = {};
@@ -2422,8 +2425,10 @@
             const customer = currentModalCustomer;
             if (!customer) return;
 
-            const orders = customer.orders || 0;
-            const revenue = customer.revenue || 0;
+            const allO = customer.allOrders || [];
+            const ords = custWebFilter ? allO.filter(o => o.website === custWebFilter) : allO;
+            const orders = ords.length;
+            const revenue = ords.reduce((s, o) => s + (o.amount || 0), 0);
             const avgOrder = orders > 0 ? revenue / orders : 0;
             const websites = (customer.websites || []).filter(w => w && w !== 'N/A');
             const unit = (u) => ` <span style="font-size:12px;color:#8c9281;">${u}</span>`;
@@ -2439,17 +2444,23 @@
             const ot = document.getElementById('cdOrderTotal');
             if (ot) ot.textContent = orders.toLocaleString('vi-VN');
 
-            // Website chips: 10 đầu + "+N website"
+            // Website chips: bấm để LỌC modal theo website (bấm lại để bỏ); chip đang lọc tô periwinkle
             const wl = document.getElementById('modalWebsiteList');
             const shown = websites.slice(0, 10);
-            let chips = shown.map(w => `<span style="background:#f2f3e8; color:#5f655a; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:600;">${webName(w)}</span>`).join('');
+            const chipFor = (w) => {
+                const esc = String(w).replace(/'/g, "\\'");
+                const active = (w === custWebFilter);
+                const st = active ? 'background:#f1f1fe; color:#6155cf; border:1px solid #c7c6f1; font-weight:700;' : 'background:#f2f3e8; color:#5f655a; font-weight:600;';
+                return `<span onclick="setCustWebFilter('${esc}')" title="Lọc theo website này (bấm lại để bỏ)" style="${st} border-radius:999px; padding:4px 10px; font-size:11.5px; cursor:pointer;">${webName(w)}</span>`;
+            };
+            let chips = shown.map(chipFor).join('');
             const more = websites.length - shown.length;
-            if (more > 0) chips += `<span style="background:#f1f1fe; color:#6155cf; border:1px solid #c7c6f1; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:700;">+${more} website</span>`;
+            if (more > 0) chips += `<span onclick="showAllWebsitesModal()" style="background:#f1f1fe; color:#6155cf; border:1px solid #c7c6f1; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:700; cursor:pointer;">+${more} website</span>`;
             wl.innerHTML = chips || '<span style="color:var(--text-light); font-size:12.5px;">Chưa có website</span>';
 
-            // Đơn hàng gần đây (5 mới nhất, all-time)
+            // Đơn hàng gần đây (5 mới nhất, theo lọc website nếu có)
             const orderList = document.getElementById('modalOrderList');
-            const sorted = [...(customer.allOrders || [])].sort((a, b) => {
+            const sorted = [...ords].sort((a, b) => {
                 const da = parseDateToDay(a.date) || '', db = parseDateToDay(b.date) || '';
                 return db.localeCompare(da);
             });
@@ -2478,29 +2489,48 @@
 
         // ===== Chart doanh thu trong modal khách (Chart.js) =====
         let custChart = null;
-        // Series doanh thu của 1 khách (đơn vị tỷ) theo kỳ: 6m (6 tháng), year (theo năm), all (mọi tháng)
+        let custUnit = 'tỷ';        // đơn vị trục chart khách: 'tỷ' hoặc 'tr' (tự thích ứng theo độ lớn)
+        let custWebFilter = null;   // null = tất cả website; hoặc 1 domain để lọc modal theo website đó
+        let custPeriod = 'all';
+        // Map tháng -> {orders,revenue} của khách, lọc theo custWebFilter nếu có
+        function custMonthlyMap(customer) {
+            if (!custWebFilter) return customer.monthlyData || {};
+            const m = {};
+            (customer.allOrders || []).forEach(o => {
+                if (o.website !== custWebFilter) return;
+                const ymd = parseDateToDay(o.date); if (!ymd) return;
+                const ym = ymd.slice(0, 7);
+                if (!m[ym]) m[ym] = { orders: 0, revenue: 0 };
+                m[ym].orders++; m[ym].revenue += (o.amount || 0);
+            });
+            return m;
+        }
+        // Series doanh thu 1 khách theo kỳ. Đơn vị TỰ THÍCH ỨNG: max >= 1 tỷ -> tỷ, nhỏ hơn -> triệu.
+        // period: '6m' (6 tháng), '12m' (12 tháng gần nhất), 'all' (mọi tháng), 'custom' (khoảng ngày)
         function buildCustRevenue(customer, period) {
-            const md = customer.monthlyData || {};
-            const r2 = (n) => Math.round((n || 0) / 1e9 * 100) / 100;
+            const md = custMonthlyMap(customer);
+            let labels = [], raw = [], subBase = 'Tất cả thời gian';
+            const monLbl = (y, m) => `T${m}/${String(y).slice(2)}`;
+
             if (period === 'custom') {
                 const from = document.getElementById('cdFrom')?.value;
                 const to = document.getElementById('cdTo')?.value;
-                if (!from || !to) return { labels: [], data: [], sub: 'Chọn khoảng ngày · đơn vị tỷ đồng' };
+                if (!from || !to) return { labels: [], data: [], unit: 'tr', sub: 'Chọn khoảng ngày' };
                 const dailyTotal = {};
                 (customer.allOrders || []).forEach(o => {
+                    if (custWebFilter && o.website !== custWebFilter) return;
                     const ymd = parseDateToDay(o.date);
                     if (!ymd || ymd < from || ymd > to) return;
                     dailyTotal[ymd] = (dailyTotal[ymd] || 0) + (o.amount || 0);
                 });
                 const toDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
                 const spanDays = (toDate(to) - toDate(from)) / 86400000;
-                const labels = [], data = [];
                 if (spanDays <= 62) {
                     const cur = toDate(from), end = toDate(to);
                     while (cur <= end) {
                         const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
                         labels.push(`${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`);
-                        data.push(r2(dailyTotal[ymd] || 0));
+                        raw.push(dailyTotal[ymd] || 0);
                         cur.setDate(cur.getDate() + 1);
                     }
                 } else {
@@ -2508,34 +2538,47 @@
                     Object.entries(dailyTotal).forEach(([ymd, v]) => { const ym = ymd.slice(0, 7); mt[ym] = (mt[ym] || 0) + v; });
                     const cur = toDate(from.slice(0, 7) + '-01'), end = toDate(to.slice(0, 7) + '-01');
                     while (cur <= end) {
-                        const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
-                        labels.push(`T${cur.getMonth() + 1}/${String(cur.getFullYear()).slice(2)}`);
-                        data.push(r2(mt[ym] || 0));
+                        labels.push(monLbl(cur.getFullYear(), cur.getMonth() + 1));
+                        raw.push(mt[`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`] || 0);
                         cur.setMonth(cur.getMonth() + 1);
                     }
                 }
-                return { labels, data, sub: `${from} → ${to} · đơn vị tỷ đồng` };
+                subBase = `${from} → ${to}`;
+            } else if (period === '12m') {
+                const ms = Object.keys(md).sort();
+                if (ms.length) {
+                    const [ly, lm] = ms[ms.length - 1].split('-').map(Number);
+                    for (let i = 11; i >= 0; i--) {
+                        const d = new Date(ly, lm - 1 - i, 1);
+                        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        labels.push(monLbl(d.getFullYear(), d.getMonth() + 1));
+                        raw.push((md[ym] && md[ym].revenue) || 0);
+                    }
+                }
+                subBase = '12 tháng gần nhất';
+            } else {
+                const ms = Object.keys(md).sort();
+                const use = (period === '6m') ? ms.slice(-6) : ms;
+                labels = use.map(ym => { const [y, m] = ym.split('-'); return monLbl(y, parseInt(m, 10)); });
+                raw = use.map(ym => md[ym].revenue || 0);
+                subBase = (period === '6m') ? '6 tháng gần nhất' : 'Tất cả thời gian';
             }
-            if (period === 'year') {
-                const yt = {};
-                Object.entries(md).forEach(([ym, v]) => { const y = ym.slice(0, 4); yt[y] = (yt[y] || 0) + (v.revenue || 0); });
-                const ys = Object.keys(yt).sort();
-                return { labels: ys, data: ys.map(y => r2(yt[y])), sub: 'Theo năm · đơn vị tỷ đồng' };
-            }
-            const ms = Object.keys(md).sort();
-            const use = (period === '6m') ? ms.slice(-6) : ms;
-            return {
-                labels: use.map(ym => { const [y, m] = ym.split('-'); return `T${parseInt(m, 10)}/${y.slice(2)}`; }),
-                data: use.map(ym => r2(md[ym].revenue)),
-                sub: (period === '6m' ? '6 tháng gần nhất' : 'Tất cả thời gian') + ' · đơn vị tỷ đồng'
-            };
+
+            const maxRaw = raw.length ? Math.max.apply(null, raw) : 0;
+            const useTy = maxRaw >= 1e9;
+            const divisor = useTy ? 1e9 : 1e6;
+            const unit = useTy ? 'tỷ' : 'tr';
+            const data = raw.map(v => Math.round(v / divisor * 100) / 100);
+            return { labels, data, unit, sub: subBase + ' · đơn vị ' + (useTy ? 'tỷ đồng' : 'triệu đồng') };
         }
         function renderCustChart(period) {
             const c = currentModalCustomer;
             if (!c) return;
+            custPeriod = period;
             const s = buildCustRevenue(c, period);
+            custUnit = s.unit || 'tỷ';
             const subEl = document.getElementById('cdChartSub');
-            if (subEl) subEl.textContent = s.sub;
+            if (subEl) subEl.textContent = (custWebFilter ? webName(custWebFilter) + ' · ' : '') + s.sub;
             const ctx = document.getElementById('custChart');
             if (!ctx || typeof Chart === 'undefined') return;
             if (!custChart) {
@@ -2556,10 +2599,10 @@
                         responsive: true, maintainAspectRatio: false,
                         plugins: {
                             legend: { display: false },
-                            tooltip: { backgroundColor: '#25271f', padding: 10, titleColor: '#23b3aa', bodyColor: '#fff', displayColors: false, callbacks: { label: (c3) => c3.parsed.y.toLocaleString('vi-VN') + ' tỷ' } }
+                            tooltip: { backgroundColor: '#25271f', padding: 10, titleColor: '#23b3aa', bodyColor: '#fff', displayColors: false, callbacks: { label: (c3) => c3.parsed.y.toLocaleString('vi-VN') + ' ' + custUnit } }
                         },
                         scales: {
-                            y: { beginAtZero: true, ticks: { display: true, color: '#9aa08e', font: { weight: 600, size: 11 }, maxTicksLimit: 5, padding: 6, callback: (v) => v + ' tỷ' }, border: { display: false }, grid: { color: '#eef0e6' } },
+                            y: { beginAtZero: true, ticks: { display: true, color: '#9aa08e', font: { weight: 600, size: 11 }, maxTicksLimit: 5, padding: 6, callback: (v) => v + ' ' + custUnit }, border: { display: false }, grid: { color: '#eef0e6' } },
                             x: { ticks: { color: '#9aa08e', font: { weight: 600, size: 11 } }, border: { display: false }, grid: { display: false } }
                         }
                     }
@@ -2574,6 +2617,12 @@
             const cr = document.getElementById('cdCustomRange');
             if (cr) cr.style.display = (period === 'custom') ? 'flex' : 'none';
             renderCustChart(period); // 'custom' chưa chọn ngày -> chart rỗng + nhắc chọn; bấm Lọc để vẽ
+        }
+        // Bấm chip website -> lọc toàn modal theo website đó (bấm lại = bỏ lọc)
+        function setCustWebFilter(website) {
+            custWebFilter = (custWebFilter === website) ? null : website;
+            renderModalStats();
+            renderCustChart(custPeriod);
         }
 
         // Close modal khi click NỀN (overlay). Chỉ đóng nếu chuột BẮT ĐẦU bấm trên chính overlay đó
@@ -5887,7 +5936,7 @@
                         <span style="font-size:12.5px; font-weight:600; color:#7c8270;">Xem doanh thu theo:</span>
                         <div class="seg-control" id="cdPeriodSeg">
                             <button data-cdp="6m" onclick="setCustPeriod('6m', this)">6 tháng</button>
-                            <button data-cdp="year" onclick="setCustPeriod('year', this)">Năm</button>
+                            <button data-cdp="12m" onclick="setCustPeriod('12m', this)">12 tháng</button>
                             <button data-cdp="all" class="active" onclick="setCustPeriod('all', this)">Tất cả</button>
                             <button data-cdp="custom" onclick="setCustPeriod('custom', this)">Tùy chọn</button>
                         </div>
