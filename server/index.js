@@ -661,12 +661,18 @@ app.get('/api/partner/follow-by-phone', requireApiKey(), async (req, res) => {
     try {
         const core = String(req.query.phone || '').replace(/\D/g, '').slice(-9);
         if (core.length < 8) return res.json({ success: true, found: false, follow: null });
+        // forEmail (Zalo CRM): chỉ trả follow do CHÍNH tài khoản đó tạo (owner_email) → tài khoản khác không thấy.
+        // Không truyền forEmail → giữ hành vi cũ (follow mới nhất bất kể owner).
+        const forEmail = String(req.query.forEmail || '').trim().toLowerCase();
+        const params = [core];
+        let ownerSql = '';
+        if (forEmail) { ownerSql = ' AND LOWER(owner_email) = ?'; params.push(forEmail); }
         const rows = await db.query(
             `SELECT id, name, phone, nhom_khach, fb_link, nguon_khach, nganh_hang,
                     nhu_cau_website, nhu_cau_sp, tinh_trang,
                     DATE_FORMAT(ngay_lien_he, '%Y-%m-%d') AS ngay_lien_he, tags, ghi_chu, owner_email
              FROM deki_follow_customers
-             WHERE RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) = ? ORDER BY id DESC LIMIT 1`, [core]);
+             WHERE RIGHT(REPLACE(REPLACE(phone,' ',''),'+',''), 9) = ?${ownerSql} ORDER BY id DESC LIMIT 1`, params);
         if (!rows.length) return res.json({ success: true, found: false, follow: null });
         const r = rows[0];
         const parseArr = (v) => { if (!v) return []; try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; } };
