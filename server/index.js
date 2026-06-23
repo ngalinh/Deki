@@ -522,17 +522,20 @@ app.delete('/api/orders', requireAuth(), async (req, res) => {
 // Phân quyền theo email (cho Zalo CRM lọc đơn theo nhân viên đang đăng nhập).
 // Trả { scoped, isAdmin, staffNames }. scoped=false → không lọc (không truyền forEmail).
 async function resolveStaffScope(email) {
-    const e = String(email || '').trim().toLowerCase();
-    if (!e) return { scoped: false, isAdmin: false, staffNames: [] };
-    const admin = await isDekiAdmin(e); // gồm cả super admin (env) + cột is_admin
-    if (admin) return { scoped: true, isAdmin: true, staffNames: [] };
-    const rows = await db.query('SELECT staff_name FROM deki_permissions WHERE email = ? LIMIT 1', [e]);
-    let staffNames = [];
-    if (rows.length && rows[0].staff_name) {
-        try { const p = JSON.parse(rows[0].staff_name); staffNames = Array.isArray(p) ? p : [String(rows[0].staff_name)]; }
-        catch { staffNames = [String(rows[0].staff_name)]; }
+    // forEmail có thể là DANH SÁCH email nối "," (Zalo CRM: email Deki gốc + phụ-trợ xem-thêm).
+    // Gộp scope: nếu BẤT KỲ email nào là admin → thấy tất cả; còn lại union staff_name của các email.
+    const emails = String(email || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+    if (!emails.length) return { scoped: false, isAdmin: false, staffNames: [] };
+    const staffSet = new Set();
+    for (const e of emails) {
+        if (await isDekiAdmin(e)) return { scoped: true, isAdmin: true, staffNames: [] };
+        const rows = await db.query('SELECT staff_name FROM deki_permissions WHERE email = ? LIMIT 1', [e]);
+        if (rows.length && rows[0].staff_name) {
+            try { const p = JSON.parse(rows[0].staff_name); (Array.isArray(p) ? p : [String(rows[0].staff_name)]).forEach((s) => staffSet.add(s)); }
+            catch { staffSet.add(String(rows[0].staff_name)); }
+        }
     }
-    return { scoped: true, isAdmin: false, staffNames };
+    return { scoped: true, isAdmin: false, staffNames: [...staffSet] };
 }
 
 // GET /api/partner/customer-by-phone?phone=09xxxxxxxx[&forEmail=...]
