@@ -1019,6 +1019,18 @@ app.post('/api/follow-tags', requireAuth(), async (req, res) => {
     }
 });
 
+// DELETE /api/follow-tags/:name - xóa tag (admin only)
+app.delete('/api/follow-tags/:name', requireAuth(), async (req, res) => {
+    try {
+        if (!req.user.isDekiAdmin) return res.status(403).json({ success: false, error: 'Admin only' });
+        const name = decodeURIComponent(req.params.name);
+        await db.query(`DELETE FROM deki_follow_tags WHERE name = ?`, [name]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ===== CÔNG VIỆC: Bàn giao =====
 
 // GET /api/handover - list (filters: from, to, task, tinh_trang, nguoi_lam)
