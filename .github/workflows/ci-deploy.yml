@@ -35,7 +35,7 @@ jobs:
           script: |
             sudo docker exec dashboard-bot-platform-1 bash -c '
               cd /app/data/bots/4b146b5d9fa4ff70 &&
-              git pull origin main &&
+              git fetch origin main && git reset --hard origin/main &&
               npm ci --omit=dev &&
               pm2 restart 4b146b5d9fa4ff70 || pm2 start server/index.js --name 4b146b5d9fa4ff70 &&
               pm2 save
