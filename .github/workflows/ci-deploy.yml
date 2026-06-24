@@ -33,10 +33,10 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script_stop: true
           script: |
-            sudo bash -c '
-              cd /app/data/bots/4b146b5d9fa4ff70
-              git pull origin main
-              npm ci --omit=dev
-              pm2 restart 4b146b5d9fa4ff70 || pm2 start server/index.js --name 4b146b5d9fa4ff70
+            sudo docker exec dashboard-bot-platform-1 bash -c '
+              cd /app/data/bots/4b146b5d9fa4ff70 &&
+              git pull origin main &&
+              npm ci --omit=dev &&
+              pm2 restart 4b146b5d9fa4ff70 || pm2 start server/index.js --name 4b146b5d9fa4ff70 &&
               pm2 save
             '
