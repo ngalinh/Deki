@@ -5160,15 +5160,31 @@
 
         function renderTagPicker() {
             const box = document.getElementById('fTagList');
-            box.innerHTML = followTags.map(t =>
-                `<span class="tag-chip ${selectedTags.includes(t) ? 'selected' : ''}" onclick="toggleTag('${t.replace(/'/g, "\\'")}')">${t}</span>`
-            ).join('') || '<span style="color:var(--text-light); font-size:12px;">Chưa có tag</span>';
+            const isAdmin = !!currentUser?.isDekiAdmin;
+            box.innerHTML = followTags.map(t => {
+                const esc = t.replace(/'/g, "\\'");
+                const xBtn = isAdmin
+                    ? `<button onclick="event.stopPropagation();deleteTag('${esc}')" title="Xóa tag" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:10px;line-height:16px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;z-index:1;">×</button>`
+                    : '';
+                return `<span class="tag-chip ${selectedTags.includes(t) ? 'selected' : ''}" onclick="toggleTag('${esc}')" style="position:relative;">${t}${xBtn}</span>`;
+            }).join('') || '<span style="color:var(--text-light); font-size:12px;">Chưa có tag</span>';
         }
 
         function toggleTag(t) {
             const i = selectedTags.indexOf(t);
             if (i === -1) selectedTags.push(t); else selectedTags.splice(i, 1);
             renderTagPicker();
+        }
+
+        async function deleteTag(name) {
+            if (!confirm(`Xóa tag "${name}" khỏi hệ thống? Tất cả khách hàng sẽ mất tag này.`)) return;
+            try {
+                await apiDelete('/api/follow-tags/' + encodeURIComponent(name));
+                followTags = followTags.filter(t => t !== name);
+                selectedTags = selectedTags.filter(t => t !== name);
+                renderTagPicker();
+                showToast('success', 'Đã xóa tag', name);
+            } catch (e) { showToast('error', 'Lỗi xóa tag', e.message); }
         }
 
         async function addCustomTag() {
