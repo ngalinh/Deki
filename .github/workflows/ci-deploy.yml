@@ -37,6 +37,7 @@ jobs:
               cd /app/data/bots/4b146b5d9fa4ff70 &&
               git fetch origin main && git reset --hard origin/main &&
               npm ci --omit=dev &&
-              pm2 restart 4b146b5d9fa4ff70 || pm2 start server/index.js --name 4b146b5d9fa4ff70 &&
+              pm2 delete 4b146b5d9fa4ff70 2>/dev/null; true &&
+              pm2 restart bot-4b146b5d9fa4ff70 &&
               pm2 save
             '
