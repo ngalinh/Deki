@@ -5300,11 +5300,22 @@
                 const statusBadge = t.tinh_trang === 'done'
                     ? '<span class="badge" style="background:rgba(16,185,129,0.12); color:var(--success);">Done</span>'
                     : '<span class="badge" style="background:rgba(245,158,11,0.12); color:var(--warning);">Pending</span>';
+                const taskColors = {
+                    'Giao hàng':   { bg: '#ddeeff', border: '#99c4ef', color: '#2563a8' },
+                    'Hàng stock':  { bg: '#ddf4e5', border: '#9bd6b1', color: '#2f8f54' },
+                    'Xử lý issue': { bg: '#fce8e3', border: '#efb6a8', color: '#c0432f' },
+                };
+                const tc = taskColors[t.task];
+                const taskBadge = t.task
+                    ? tc
+                        ? `<span class="badge" style="background:${tc.bg}; border-color:${tc.border}; color:${tc.color};">${t.task}</span>`
+                        : `<span class="badge">${t.task}</span>`
+                    : '-';
                 return `
                     <tr>
                         <td>${i + 1}</td>
                         <td style="color:var(--text-gray);">${fmtDateVN(t.ngay_thang) || '-'}</td>
-                        <td>${t.task || '-'}</td>
+                        <td>${taskBadge}</td>
                         <td style="color:var(--text-gray); max-width:340px; min-width:200px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.cong_viec || '-'}</td>
                         <td>${statusBadge}</td>
                         <td style="color:var(--text-gray);">${t.nguoi_lam || '-'}</td>
