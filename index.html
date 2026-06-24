@@ -5179,7 +5179,7 @@
         async function deleteTag(name) {
             if (!confirm(`Xóa tag "${name}" khỏi hệ thống? Tất cả khách hàng sẽ mất tag này.`)) return;
             try {
-                await apiDelete('/api/follow-tags/' + encodeURIComponent(name));
+                await apiPost('/api/follow-tags/delete', { name });
                 followTags = followTags.filter(t => t !== name);
                 selectedTags = selectedTags.filter(t => t !== name);
                 renderTagPicker();
