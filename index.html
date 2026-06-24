@@ -2399,8 +2399,9 @@
 
             list.innerHTML = sorted.map((w, i) => {
                 const hasStats = w.orders > 0;
+                const esc = String(w.name).replace(/'/g, "\\'");
                 return `
-                    <div class="order-item">
+                    <div class="order-item" onclick="pickCustWebsite('${esc}')" title="Lọc thông tin khách theo website này" style="cursor:pointer;">
                         <span style="display: flex; align-items: center; gap: 10px;">
                             <span style="color: var(--text-light); font-weight: 500; min-width: 24px;">${i + 1}.</span>
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary);">
@@ -2623,6 +2624,13 @@
             custWebFilter = (custWebFilter === website) ? null : website;
             renderModalStats();
             renderCustChart(custPeriod);
+        }
+        // Bấm 1 website trong modal "Tất cả websites" -> lọc modal chính theo website đó + đóng danh sách
+        function pickCustWebsite(website) {
+            custWebFilter = website;
+            renderModalStats();
+            renderCustChart(custPeriod);
+            closeAllWebsitesModal();
         }
 
         // Close modal khi click NỀN (overlay). Chỉ đóng nếu chuột BẮT ĐẦU bấm trên chính overlay đó
@@ -4941,7 +4949,7 @@
                         <td>${statusBadge}</td>
                         <td>${lastContact ? `<span class="cv-history" onmouseenter="showHist(event, ${c.id})" onmousemove="moveHist(event)" onmouseleave="hideHist()">${fmtDateVN(lastContact)}${hasHist ? ` <span style="color:var(--text-light); font-size:11px;">(${c.history.length})</span>` : ''}</span>` : '-'}</td>
                         <td>${tagsHtml}</td>
-                        <td style="color:var(--text-gray); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(c.ghi_chu||'').replace(/"/g,'&quot;')}">${c.ghi_chu || '-'}</td>
+                        <td style="color:var(--text-gray); max-width:220px; min-width:140px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${c.ghi_chu || '-'}</td>
                         <td style="white-space:nowrap;">
                             <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
                                 <button class="act-btn act-edit" title="Sửa" onclick="openFollowModal(${c.id})">
@@ -5297,10 +5305,10 @@
                         <td>${i + 1}</td>
                         <td style="color:var(--text-gray);">${fmtDateVN(t.ngay_thang) || '-'}</td>
                         <td>${t.task || '-'}</td>
-                        <td style="color:var(--text-gray); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(t.cong_viec||'').replace(/"/g,'&quot;')}">${t.cong_viec || '-'}</td>
+                        <td style="color:var(--text-gray); max-width:340px; min-width:200px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.cong_viec || '-'}</td>
                         <td>${statusBadge}</td>
                         <td style="color:var(--text-gray);">${t.nguoi_lam || '-'}</td>
-                        <td style="color:var(--text-gray); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${(t.ghi_chu||'').replace(/"/g,'&quot;')}">${t.ghi_chu || '-'}</td>
+                        <td style="color:var(--text-gray); max-width:220px; min-width:140px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.ghi_chu || '-'}</td>
                         <td style="white-space:nowrap;">
                             <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="openHandoverModal(${t.id})">Sửa</button>
                             <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px; color:var(--error); border-color:var(--error);" onclick="deleteHandover(${t.id})">Xóa</button>
@@ -5926,7 +5934,7 @@
                         </div>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:9px;">
-                        <span style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:700;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c8270" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website quan tâm</span>
+                        <span onclick="showAllWebsitesModal()" title="Xem doanh thu tất cả website" style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:700; cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c8270" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Website quan tâm<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9aa08e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;"><path d="m9 18 6-6-6-6"/></svg></span>
                         <div id="modalWebsiteList" style="background:#fcfcf8; border:1px solid #eef0e6; border-radius:16px; padding:13px; display:flex; flex-wrap:wrap; gap:6px;"></div>
                     </div>
                 </div>
