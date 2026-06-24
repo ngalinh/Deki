@@ -32,8 +32,8 @@ jobs:
           username: vmadmin
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /home/vmadmin/Deki
+            cd /app/data/bots/4b146b5d9fa4ff70
             git pull origin main
             npm ci --omit=dev
-            pm2 restart deki || pm2 start server/index.js --name deki
-            pm2 save
+            sudo pm2 restart 4b146b5d9fa4ff70 || sudo pm2 start server/index.js --name 4b146b5d9fa4ff70
+            sudo pm2 save
