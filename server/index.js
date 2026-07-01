@@ -268,7 +268,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
 
         // Parse rows → list orders + customers
         // Key khách = name + phone → cùng tên khác SĐT là 2 khách riêng
-        const custKey = (name, phone) => `${name} ${phone || ''}`;
+        const custKey = (name, phone) => `${String(name||'').trim().toLowerCase()} ${String(phone||'').trim()}`;
         const customersMap = new Map(); // key → { name, phone, segment }
         const orders = [];
 
@@ -358,10 +358,24 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                         o.tyGia, o.shipQt, o.phuThu, o.giamGia, o.lyDoGiamGia, o.amount);
                 }
                 if (placeholders.length > 0) {
-                    const sql = `INSERT IGNORE INTO deki_orders
+                    // UPSERT theo order_code: đơn đã có sẽ được cập nhật lại (ngày hoàn thành,
+                    // thành tiền, nhân viên... có thể đổi giữa các lần xuất) → tránh dữ liệu kẹt.
+                    const sql = `INSERT INTO deki_orders
                         (customer_id, order_code, order_date, website, brand, employee,
                          ty_gia, ship_quoc_te, phu_thu, giam_gia, ly_do_giam_gia, amount)
-                        VALUES ${placeholders.join(', ')}`;
+                        VALUES ${placeholders.join(', ')}
+                        ON DUPLICATE KEY UPDATE
+                            customer_id = VALUES(customer_id),
+                            order_date = VALUES(order_date),
+                            website = VALUES(website),
+                            brand = VALUES(brand),
+                            employee = VALUES(employee),
+                            ty_gia = VALUES(ty_gia),
+                            ship_quoc_te = VALUES(ship_quoc_te),
+                            phu_thu = VALUES(phu_thu),
+                            giam_gia = VALUES(giam_gia),
+                            ly_do_giam_gia = VALUES(ly_do_giam_gia),
+                            amount = VALUES(amount)`;
                     const [r] = await conn.execute(sql, values);
                     inserted += r.affectedRows;
                 }
