@@ -310,7 +310,8 @@
             border-radius: 20px;
             margin-bottom: 20px;
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
+            gap: 14px;
             align-items: center;
             box-shadow: 0 16px 36px -22px rgba(45,55,40,.4);
         }
@@ -331,6 +332,7 @@
         .header-actions {
             display: flex;
             gap: 10px;
+            margin-left: auto;
         }
 
         .btn {
@@ -1448,13 +1450,6 @@
                     <h2>Danh sách khách hàng</h2>
                     <p class="header-sub">902 khách hàng</p>
                 </div>
-                <div class="header-actions" style="gap:10px;">
-                    <div class="hdr-user">
-                        <div class="av hdr-user-av"></div>
-                        <span class="nm hdr-user-name"></span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                    </div>
-                </div>
             </div>
 
             <!-- Sub-tabs -->
@@ -1699,7 +1694,7 @@
                     <h2>Báo cáo & Phân tích</h2>
                     <p class="header-sub" id="reportPeriodLabel">Tất cả thời gian</p>
                 </div>
-                <div class="view-toggle">
+                <div class="view-toggle" style="margin-left:auto;">
                     <button class="view-btn active" onclick="updateReportPeriod('all')">Tất cả</button>
                     <button class="view-btn" onclick="updateReportPeriod('week')">Tuần</button>
                     <button class="view-btn" onclick="updateReportPeriod('month')">Tháng</button>
@@ -1884,13 +1879,6 @@
                     <h2>Quản lý quyền</h2>
                     <p class="header-sub">Cấp/thu hồi quyền truy cập Deki cho nhân viên</p>
                 </div>
-                <div class="header-actions" style="gap:10px;">
-                    <div class="hdr-user">
-                        <div class="av hdr-user-av"></div>
-                        <span class="nm hdr-user-name"></span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                    </div>
-                </div>
             </div>
 
             <div class="filters" style="margin-bottom: 20px;">
@@ -1956,13 +1944,6 @@
                 <div>
                     <h2>Công việc</h2>
                     <p class="header-sub">Quản lý follow khách & bàn giao công việc</p>
-                </div>
-                <div class="header-actions" style="gap:10px;">
-                    <div class="hdr-user">
-                        <div class="av hdr-user-av"></div>
-                        <span class="nm hdr-user-name"></span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                    </div>
                 </div>
             </div>
 
