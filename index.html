@@ -722,6 +722,7 @@
         }
 
         /* Responsive */
+        .hdr-menu-btn { display: none; }
         .mobile-menu-btn { display: none; }
         .sidebar-overlay { display: none; }
         @media (max-width: 768px) {
@@ -736,7 +737,7 @@
             .sidebar.open { transform: none; }
             .sidebar-bottom-toggle { display: none; }   /* không cần thu gọn trong chế độ drawer */
 
-            .main-content { margin-left: 0; padding: 60px 12px 36px; }
+            .main-content { margin-left: 0; padding: 16px 12px 36px; }
             body.sidebar-collapsed .main-content { margin-left: 0; }
             /* Nếu trước đó đang thu gọn (desktop) -> trên mobile vẫn mở drawer đầy đủ */
             body.sidebar-collapsed .sidebar { width: 270px; }
@@ -746,14 +747,14 @@
             body.sidebar-collapsed .logo { justify-content: flex-start; padding: 6px 6px 22px; }
             body.sidebar-collapsed .nav-item { justify-content: flex-start; padding: 11px 14px; gap: 12px; }
 
-            /* Nút hamburger nổi góc trái */
-            .mobile-menu-btn {
-                display: flex; position: fixed; top: 12px; left: 12px; z-index: 180;
-                width: 44px; height: 44px; border-radius: 14px; cursor: pointer;
-                background: rgba(255,255,255,.72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-                border: 1px solid rgba(255,255,255,.6); box-shadow: 0 8px 20px -10px rgba(45,55,40,.45);
-                align-items: center; justify-content: center; color: #25271f;
+            /* Nút hamburger trong header (mobile) */
+            .hdr-menu-btn {
+                display: flex; align-items: center; justify-content: center;
+                width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+                background: transparent; border: none; cursor: pointer; color: var(--text-dark);
+                transition: background 0.15s;
             }
+            .hdr-menu-btn:hover { background: rgba(0,0,0,0.06); }
             /* Overlay mờ khi mở drawer */
             .sidebar-overlay {
                 display: block; position: fixed; inset: 0; z-index: 190;
@@ -1215,10 +1216,6 @@
     </style>
 </head>
 <body>
-    <!-- Nút menu mobile + overlay (chỉ hiện ở màn nhỏ) -->
-    <button class="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-    </button>
     <div class="sidebar-overlay" onclick="closeMobileNav()"></div>
 
     <!-- Sidebar -->
@@ -1299,15 +1296,11 @@
         <!-- Dashboard View -->
         <div id="dashboard-view">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <h2>Dashboard</h2>
                 <div class="header-actions" style="gap:10px;">
-                    <button class="hdr-iconbtn" title="Trợ giúp">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-                    </button>
-                    <button class="hdr-iconbtn" title="Thông báo">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                        <span class="dot"></span>
-                    </button>
                     <div class="hdr-user">
                         <div class="av hdr-user-av"></div>
                         <span class="nm hdr-user-name"></span>
@@ -1448,18 +1441,14 @@
         <!-- Customers View -->
         <div id="customers-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Danh sách khách hàng</h2>
                     <p class="header-sub">902 khách hàng</p>
                 </div>
                 <div class="header-actions" style="gap:10px;">
-                    <button class="hdr-iconbtn" title="Trợ giúp">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-                    </button>
-                    <button class="hdr-iconbtn" title="Thông báo">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                        <span class="dot"></span>
-                    </button>
                     <div class="hdr-user">
                         <div class="av hdr-user-av"></div>
                         <span class="nm hdr-user-name"></span>
@@ -1607,6 +1596,9 @@
         <!-- Đơn hàng View -->
         <div id="orders-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Danh sách đơn hàng</h2>
                     <p class="header-sub" id="ordersCount">0 đơn hàng</p>
@@ -1700,6 +1692,9 @@
         <!-- Reports View -->
         <div id="reports-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Báo cáo & Phân tích</h2>
                     <p class="header-sub" id="reportPeriodLabel">Tất cả thời gian</p>
@@ -1764,6 +1759,9 @@
         <!-- Filters View -->
         <div id="filters-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Lọc khách hàng quan tâm</h2>
                     <p class="header-sub">Kết hợp nhiều tiêu chí để tìm nhóm khách hàng phù hợp</p>
@@ -1879,18 +1877,14 @@
         <!-- Admin Panel View -->
         <div id="admin-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Quản lý quyền</h2>
                     <p class="header-sub">Cấp/thu hồi quyền truy cập Deki cho nhân viên</p>
                 </div>
                 <div class="header-actions" style="gap:10px;">
-                    <button class="hdr-iconbtn" title="Trợ giúp">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-                    </button>
-                    <button class="hdr-iconbtn" title="Thông báo">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                        <span class="dot"></span>
-                    </button>
                     <div class="hdr-user">
                         <div class="av hdr-user-av"></div>
                         <span class="nm hdr-user-name"></span>
@@ -1956,18 +1950,14 @@
         <!-- Công việc View -->
         <div id="congviec-view" class="section-hidden">
             <div class="header">
+                <button class="hdr-menu-btn" onclick="toggleMobileNav()" aria-label="Mở menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
                 <div>
                     <h2>Công việc</h2>
                     <p class="header-sub">Quản lý follow khách & bàn giao công việc</p>
                 </div>
                 <div class="header-actions" style="gap:10px;">
-                    <button class="hdr-iconbtn" title="Trợ giúp">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-                    </button>
-                    <button class="hdr-iconbtn" title="Thông báo">
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                        <span class="dot"></span>
-                    </button>
                     <div class="hdr-user">
                         <div class="av hdr-user-av"></div>
                         <span class="nm hdr-user-name"></span>
