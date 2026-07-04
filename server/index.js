@@ -326,7 +326,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 shipQt: numAt(colIdx.shipQt),
                 phuThu: numAt(colIdx.phuThu),
                 giamGia: numAt(colIdx.giamGia),
-                lyDoGiamGia: colIdx.lyDoGiamGia !== -1 && row[colIdx.lyDoGiamGia] ? String(row[colIdx.lyDoGiamGia]).trim() : null,
+                lyDoGiamGia: null, // Cột "Lý do giảm giá" không dùng trên Deki → bỏ qua giá trị (tránh lỗi "Data too long" khi giá trị dài)
                 amount: Number(row[colIdx.total]) || 0
             });
         }
