@@ -657,6 +657,22 @@
             font-size: 13.5px;
             color: var(--text-dark);
         }
+        /* Nhãn "new" sau tên khách mới (đơn đầu tiên toàn thời gian rơi vào khoảng đang lọc) */
+        .new-badge {
+            display: inline-block;
+            margin-left: 7px;
+            padding: 1px 7px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            color: #2f8f54;
+            background: #e7f5ec;
+            border: 1px solid #c9e9d5;
+            border-radius: 999px;
+            vertical-align: middle;
+            line-height: 1.6;
+        }
 
         .badge {
             display: inline-block;
@@ -4117,6 +4133,25 @@
             }
         }
 
+        // Bấm tên khách → tra SĐT qua Basso Partner API → mở trang chi tiết khách trên basso.vn
+        async function openBassoCustomer(phone, ev) {
+            if (ev) ev.preventDefault();
+            if (!phone) { showToast('error', 'Không mở được khách', 'Khách chưa có số điện thoại'); return; }
+            if (bassoOpening) return;
+            bassoOpening = true;
+            try {
+                const res = await fetch(apiUrl('/api/orders/customer-link?phone=' + encodeURIComponent(phone)),
+                    { credentials: 'include', headers: devHeaders() });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.url) throw new Error(data.error || `HTTP ${res.status}`);
+                window.open(data.url, '_blank', 'noopener');
+            } catch (e) {
+                showToast('error', 'Không mở được khách', e.message);
+            } finally {
+                bassoOpening = false;
+            }
+        }
+
         function initOrdersView() {
             if (!ordEmployeesLoaded) {
                 // Populate dropdown nhân viên từ allCustomers
@@ -4136,6 +4171,7 @@
                 allCustomers.forEach(c => { if (c.segment && c.segment !== 'N/A') segs.add(c.segment); });
                 const ssel = document.getElementById('ordSegment');
                 ssel.innerHTML = '<option value="">Tất cả phân nhóm</option>' +
+                    '<option value="__new__">Khách mới</option>' +
                     Array.from(segs).sort().map(s => `<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
                 ordEmployeesLoaded = true;
             }
@@ -4201,7 +4237,7 @@
                 <tr>
                     <td style="color:var(--text-gray); white-space:nowrap;">${o.date || '-'}</td>
                     <td class="order-code">${o.code ? `<a href="#" onclick="openBassoOrder('${String(o.code).replace(/'/g, "\\'")}', event)" title="Mở đơn ${o.code} trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${o.code}</a>` : '-'}</td>
-                    <td class="customer-name">${o.customer ? clampName(o.customer) : '-'}</td>
+                    <td class="customer-name">${o.customer ? `<a href="#" onclick="openBassoCustomer('${String(o.phone || '').replace(/'/g, "\\'")}', event)" title="Mở chi tiết khách trên Basso" style="color:inherit; text-decoration:none; cursor:pointer;">${clampName(o.customer)}</a>` : '-'}${o.isNew ? '<span class="new-badge">new</span>' : ''}</td>
                     <td style="color:var(--text-gray);">${o.phone || '-'}</td>
                     <td>${o.brand ? `<span class="badge ${removeDiacritics(o.brand).toLowerCase().replace(/\s+/g,'-')}">${o.brand}</span>` : '-'}</td>
                     <td>${o.segment ? `<span class="badge ${removeDiacritics(o.segment).toLowerCase().replace(/\s+/g,'-')}">${o.segment}</span>` : '-'}</td>

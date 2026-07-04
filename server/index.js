@@ -772,6 +772,24 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         const staffNames = req.user.staffNames || [];
         if (!isAdmin && staffNames.length === 0) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
 
+        // ===== "Khách mới": khách có đơn ĐẦU TIÊN trên TOÀN BỘ thời gian (mọi nhân viên) rơi vào
+        // khoảng đang lọc. Không có range (Tất cả thời gian) → tính theo tháng gần nhất có dữ liệu.
+        // VD: đơn đầu của khách ở tháng 6 → lọc tháng 6 = mới; lọc tháng 7 (khách quay lại) = cũ. =====
+        let nwFrom, nwTo;
+        if (req.query.from) {
+            nwFrom = req.query.from; nwTo = req.query.to || '9999-12-31';
+        } else {
+            const mrow = await db.query(
+                `SELECT DATE_FORMAT(MAX(order_date),'%Y-%m-01') AS f,
+                        DATE_FORMAT(LAST_DAY(MAX(order_date)),'%Y-%m-%d') AS t
+                 FROM deki_orders`);
+            nwFrom = mrow[0]?.f || '9999-01-01';
+            nwTo = mrow[0]?.t || '9999-01-01';
+        }
+        // Tập customer_id khách mới (đơn đầu tiên toàn thời gian nằm trong [nwFrom, nwTo])
+        const newSubSql = `SELECT customer_id FROM deki_orders GROUP BY customer_id HAVING MIN(order_date) BETWEEN ? AND ?`;
+        const newSubParams = [nwFrom, nwTo];
+
         const where = [], params = [];
         if (isAdmin) {
             if (req.query.employee) { where.push('o.employee = ?'); params.push(req.query.employee); }
@@ -781,7 +799,12 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
         if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }
         if (req.query.brand) { where.push('o.brand = ?'); params.push(req.query.brand); }
-        if (req.query.segment) { where.push('c.segment = ?'); params.push(req.query.segment); }
+        if (req.query.segment === '__new__') {
+            // Lọc "Khách mới": chỉ đơn của khách mới, KHÔNG lọc theo segment thật.
+            where.push(`c.id IN (${newSubSql})`); params.push(...newSubParams);
+        } else if (req.query.segment) {
+            where.push('c.segment = ?'); params.push(req.query.segment);
+        }
         if (req.query.q) {
             const term = `%${String(req.query.q).trim()}%`;
             where.push('(c.name LIKE ? OR c.phone LIKE ? OR o.order_code LIKE ?)');
@@ -803,11 +826,12 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
             `SELECT DATE_FORMAT(o.order_date,'%d-%m-%Y') AS date, o.order_code AS code,
                     c.name AS customer, c.phone AS phone, c.segment AS segment,
                     o.brand, o.employee, o.website,
-                    o.ty_gia, o.ship_quoc_te, o.phu_thu, o.giam_gia, o.ly_do_giam_gia, o.amount
+                    o.ty_gia, o.ship_quoc_te, o.phu_thu, o.giam_gia, o.ly_do_giam_gia, o.amount,
+                    (c.id IN (${newSubSql})) AS isNew
              FROM deki_orders o JOIN deki_customers c ON c.id = o.customer_id
              ${whereSql} ORDER BY o.order_date DESC, o.id DESC
              LIMIT ${pageSize} OFFSET ${offset}`,
-            params
+            [...newSubParams, ...params]
         );
         res.json({
             success: true,
@@ -817,7 +841,8 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
                 ship_quoc_te: Number(r.ship_quoc_te) || 0,
                 phu_thu: Number(r.phu_thu) || 0,
                 giam_gia: Number(r.giam_gia) || 0,
-                amount: Number(r.amount) || 0
+                amount: Number(r.amount) || 0,
+                isNew: Number(r.isNew) ? 1 : 0
             })),
             total, totalRevenue, page, pageSize
         });
@@ -872,6 +897,32 @@ app.get('/api/orders/order-link', requireAuth(), async (req, res) => {
     } catch (e) {
         console.error('[basso] order-link failed:', e.message);
         res.status(500).json({ success: false, error: 'Tra cứu đơn thất bại' });
+    }
+});
+
+// GET /api/orders/customer-link?phone=09xxx → { url } mở trang chi tiết khách trên basso.vn
+// Tra findCustomerByPhone (Partner API) → data.customer.id (users.id) → /management/customer/detail/<id>
+app.get('/api/orders/customer-link', requireAuth(), async (req, res) => {
+    const phone = String(req.query.phone || '').trim();
+    if (!phone) return res.status(400).json({ success: false, error: 'Khách chưa có số điện thoại' });
+    if (!BASSO.url || !BASSO.key || !BASSO.email || !BASSO.pass) {
+        return res.status(400).json({ success: false, error: 'Chưa cấu hình Basso API (BASSO_API_URL/KEY/EMAIL/PASS)' });
+    }
+    try {
+        const fetchCust = (token) =>
+            fetch(`${BASSO.url}/partner/findCustomerByPhone?phone=${encodeURIComponent(phone)}`, {
+                headers: { 'X-Partner-Api-Key': BASSO.key, Authorization: `Bearer ${token}` }
+            });
+        let token = bassoToken || (await bassoLogin());
+        let r = await fetchCust(token);
+        if (r.status === 401 || r.status === 403) { token = await bassoLogin(); r = await fetchCust(token); }
+        const data = await r.json().catch(() => null);
+        const id = data?.data?.customer?.id;
+        if (!id) return res.status(404).json({ success: false, error: 'Không tìm thấy khách trên Basso' });
+        res.json({ success: true, id, url: `${BASSO.url}/management/customer/detail/${id}` });
+    } catch (e) {
+        console.error('[basso] customer-link failed:', e.message);
+        res.status(500).json({ success: false, error: 'Tra cứu khách thất bại' });
     }
 });
 
