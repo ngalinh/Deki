@@ -272,11 +272,18 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
         const customersMap = new Map(); // key → { name, phone, segment }
         const orders = [];
 
+        // Chuẩn hoá SĐT "00" lỗi (không tồn tại trên Basso) → "09". Hỏi Basso 1 lần cho các số "00".
+        const rawZeroPhones = dataRows
+            .map(r => (colIdx.phone !== -1 && r[colIdx.phone] != null) ? String(r[colIdx.phone]).trim() : '')
+            .filter(p => /^00/.test(p.replace(/\D/g, '')));
+        const zeroMap = await resolveZeroZeroPhones(rawZeroPhones);
+
         for (const row of dataRows) {
             const name = String(row[colIdx.customer]).trim();
             if (!name) continue;
             const segment = colIdx.segment !== -1 && row[colIdx.segment] ? String(row[colIdx.segment]).trim() : null;
-            const phone = colIdx.phone !== -1 && row[colIdx.phone] != null ? String(row[colIdx.phone]).trim() : '';
+            let phone = colIdx.phone !== -1 && row[colIdx.phone] != null ? String(row[colIdx.phone]).trim() : '';
+            if (phone && zeroMap.has(phone)) phone = zeroMap.get(phone);
             const key = custKey(name, phone);
             if (!customersMap.has(key)) {
                 customersMap.set(key, { name, phone, segment });
@@ -873,6 +880,29 @@ async function bassoLogin() {
     if (!token) throw new Error('Basso login failed');
     bassoToken = token;
     return token;
+}
+
+// Với các SĐT bắt đầu "00": hỏi Basso findCustomerByPhone. Số nào Basso KHÔNG có đúng (found:false
+// hoặc phone trả về khác) → map về "09" (bỏ số 0 đầu dư). Số "00" có thật trên Basso → giữ nguyên.
+// Trả Map(original -> "09"). Chưa cấu hình Basso hoặc lỗi → Map rỗng (không đổi gì, giữ như file).
+async function resolveZeroZeroPhones(phones) {
+    const map = new Map();
+    const uniq = [...new Set((phones || []).filter(p => /^00/.test(String(p).replace(/\D/g, ''))))];
+    if (!uniq.length || !BASSO.url || !BASSO.key || !BASSO.email || !BASSO.pass) return map;
+    let token;
+    try { token = bassoToken || (await bassoLogin()); } catch { return map; }
+    for (const p of uniq) {
+        try {
+            const call = (tk) => fetch(`${BASSO.url}/partner/findCustomerByPhone?phone=${encodeURIComponent(p)}`,
+                { headers: { 'X-Partner-Api-Key': BASSO.key, Authorization: `Bearer ${tk}` } });
+            let r = await call(token);
+            if (r.status === 401 || r.status === 403) { token = await bassoLogin(); r = await call(token); }
+            const d = await r.json().catch(() => null);
+            const okExact = d?.data?.found === true && String(d?.data?.customer?.phone) === String(p);
+            if (!okExact) map.set(p, '0' + String(p).replace(/\D/g, '').replace(/^0+/, ''));
+        } catch { /* lỗi mạng → bỏ qua số này, giữ nguyên */ }
+    }
+    return map;
 }
 
 // GET /api/orders/order-link?code=BSxxx → { url } để mở trang chi tiết đơn trên basso.vn
