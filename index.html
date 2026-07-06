@@ -4601,14 +4601,15 @@
             let newCustomers = 0;
 
             allCustomers.forEach(customer => {
-                let firstYmd = null, hasOrderInRange = false, custHasAny = false;
+                let globalFirstYmd = null, hasOrderInRange = false, custHasAny = false;
                 (customer.allOrders || []).forEach(o => {
-                    if (!empPass(o)) return;
                     const ymd = parseDateToDay(o.date);
                     if (!ymd) return;
+                    // "Khách mới" = đơn đầu tiên TOÀN THỜI GIAN (mọi nhân viên) → tính trước khi lọc NV
+                    if (!globalFirstYmd || ymd < globalFirstYmd) globalFirstYmd = ymd;
+                    if (!empPass(o)) return;
                     custHasAny = true;
                     grandOrders += 1; grandRevenue += (o.amount || 0);
-                    if (!firstYmd || ymd < firstYmd) firstYmd = ymd;
 
                     const inRange = !range || (ymd >= range.from && ymd <= range.to);
                     if (inRange) { hasOrderInRange = true; totalOrders += 1; totalRevenue += (o.amount || 0); }
@@ -4619,10 +4620,12 @@
                     monthlyTotals[ym].orders += 1;
                     monthlyTotals[ym].revenue += (o.amount || 0);
                 });
-                if (custHasAny) { custAll.add(customer.id); if (firstYmd) firstMonthByCust[customer.id] = firstYmd.slice(0, 7); }
+                // firstMonthByCust theo đơn đầu TOÀN THỜI GIAN (chỉ khách mà NV đang lọc có phục vụ)
+                if (custHasAny) { custAll.add(customer.id); if (globalFirstYmd) firstMonthByCust[customer.id] = globalFirstYmd.slice(0, 7); }
                 if (range) {
                     if (hasOrderInRange) custInRange.add(customer.id);
-                    if (firstYmd && firstYmd >= range.from && firstYmd <= range.to) newCustomers++;
+                    // Khách mới = đơn đầu toàn thời gian rơi vào kỳ, VÀ (nếu lọc NV) khách có đơn của NV trong kỳ
+                    if (globalFirstYmd && globalFirstYmd >= range.from && globalFirstYmd <= range.to && hasOrderInRange) newCustomers++;
                 }
             });
 
