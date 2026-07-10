@@ -1321,6 +1321,10 @@
                 </button>
                 <h2>Dashboard</h2>
                 <div class="header-actions" style="gap:10px;">
+                    <button class="guide-btn" onclick="openGuide()" title="Hướng dẫn sử dụng Deki">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span>Hướng dẫn</span>
+                    </button>
                     <div class="hdr-user">
                         <div class="av hdr-user-av"></div>
                         <span class="nm hdr-user-name"></span>
@@ -3285,6 +3289,10 @@
         function closeDeleteDataModal() {
             document.getElementById('deleteDataModal').classList.remove('active');
         }
+        // ===== Hướng dẫn sử dụng =====
+        function openGuide() { document.getElementById('guideModal').classList.add('active'); }
+        function closeGuide() { document.getElementById('guideModal').classList.remove('active'); }
+        function gdScroll(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
         async function confirmDeleteData() {
             const from = document.getElementById('delFrom').value;
             const to = document.getElementById('delTo').value;
@@ -6091,6 +6099,140 @@
                     <button class="btn btn-secondary" onclick="closeDeleteDataModal()">Hủy</button>
                     <button class="btn btn-danger" onclick="confirmDeleteData()">Xóa</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Hướng dẫn sử dụng ===== -->
+    <style>
+        .guide-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:999px; background:linear-gradient(160deg,rgba(255,255,255,.6),rgba(255,255,255,.3)); border:1px solid #e3e6d8; color:#3d4636; font-size:13px; font-weight:700; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .guide-btn:hover { border-color:#6f63e6; color:#6f63e6; box-shadow:0 3px 12px rgba(111,99,230,.14); }
+        .guide-btn svg { stroke:currentColor; }
+        #guideModal .modal-content { max-width: 880px; }
+        .gd-body { padding: 18px 26px 30px; }
+        .gd-intro { font-size:13.5px; color:#5f655a; line-height:1.62; margin-bottom:16px; }
+        .gd-toc { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border-sage); }
+        .gd-toc button { padding:6px 13px; border-radius:999px; border:1px solid #e3e6d8; background:#fbfcf6; color:#4d5544; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .12s; }
+        .gd-toc button:hover { border-color:#6f63e6; color:#6f63e6; }
+        .gd-sec { margin-bottom:26px; scroll-margin-top:8px; }
+        .gd-sec > h3 { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:800; color:#2b3124; margin:0 0 10px; letter-spacing:-.01em; }
+        .gd-num { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; background:#6f63e6; color:#fff; font-size:13px; font-weight:800; flex:none; }
+        .gd-sec p { font-size:13.5px; color:#4d5544; line-height:1.62; margin:0 0 10px; }
+        .gd-sec ul { margin:0 0 12px; padding-left:2px; list-style:none; }
+        .gd-sec li { position:relative; padding-left:20px; font-size:13.5px; color:#4d5544; line-height:1.6; margin-bottom:7px; }
+        .gd-sec li::before { content:""; position:absolute; left:4px; top:9px; width:6px; height:6px; border-radius:50%; background:#23b3aa; }
+        .gd-sec li b, .gd-sec p b { color:#2b3124; }
+        .gd-sub { font-weight:800; color:#3d4636; font-size:13.5px; margin:14px 0 6px; }
+        .gd-note { background:#f2f7ec; border:1px solid #d8e6c8; border-left:3px solid #2f8f54; border-radius:8px; padding:10px 14px; font-size:12.8px; color:#3f5236; line-height:1.55; margin:8px 0 12px; }
+        .gd-note.warn { background:#fdf2ee; border-color:#f2cfc4; border-left-color:#c0432f; color:#7a3527; }
+        .gd-tag { display:inline-block; padding:1px 8px; border-radius:6px; background:#eceafe; color:#5b50c8; font-weight:700; font-size:12px; white-space:nowrap; }
+    </style>
+    <div class="modal-overlay" id="guideModal" onclick="if(event.target===this)closeGuide()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Hướng dẫn sử dụng — Deki CRM</h2>
+                <button class="modal-close" onclick="closeGuide()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body gd-body">
+                <p class="gd-intro">Deki là hệ thống quản lý khách hàng &amp; đơn hàng, dữ liệu đồng bộ từ Basso. Đăng nhập bằng tài khoản <b>basso.vn</b>. <b>Admin</b> xem toàn bộ dữ liệu; <b>nhân viên</b> chỉ xem khách hàng &amp; đơn hàng do mình phụ trách.</p>
+
+                <div class="gd-toc">
+                    <button onclick="gdScroll('gd-dashboard')">Dashboard</button>
+                    <button onclick="gdScroll('gd-orders')">Đơn hàng</button>
+                    <button onclick="gdScroll('gd-customers')">Khách hàng</button>
+                    <button onclick="gdScroll('gd-work')">Công việc</button>
+                    <button onclick="gdScroll('gd-perm')">Quản lý quyền</button>
+                    <button onclick="gdScroll('gd-import')">Nhập / Xuất Excel</button>
+                </div>
+
+                <div class="gd-sec" id="gd-dashboard">
+                    <h3><span class="gd-num">1</span> Dashboard — Tổng quan kinh doanh</h3>
+                    <p>Màn hình tổng hợp số liệu toàn bộ hoạt động.</p>
+                    <div class="gd-sub">Bộ lọc</div>
+                    <ul>
+                        <li><b>Thời gian:</b> Tháng · Năm (năm dương lịch) · Tất cả thời gian · Tùy chọn (tự chọn khoảng ngày).</li>
+                        <li><b>Nhân viên:</b> xem số liệu của một nhân viên cụ thể, hoặc "Tất cả nhân viên".</li>
+                    </ul>
+                    <div class="gd-sub">4 chỉ số (kèm % so với tháng trước)</div>
+                    <ul>
+                        <li><b>Tổng khách hàng</b> — số khách trong phạm vi lọc.</li>
+                        <li><b>Khách mới</b> — khách có <b>đơn hàng đầu tiên (tính trên toàn bộ thời gian, mọi nhân viên)</b> rơi vào kỳ đang lọc. Chọn "Tất cả thời gian" thì tính theo tháng gần nhất có dữ liệu.</li>
+                        <li><b>Tổng đơn hàng</b> · <b>Tổng doanh thu</b> — trong phạm vi lọc.</li>
+                    </ul>
+                    <div class="gd-sub">Biểu đồ</div>
+                    <ul>
+                        <li><b>Doanh thu theo thời gian</b> — biểu đồ đường, thay đổi theo bộ lọc thời gian.</li>
+                        <li><b>Phân nhóm khách hàng</b> — biểu đồ tròn: Khách Lẻ · CTV · Sỉ nhỏ · Sỉ vừa · Sỉ to.</li>
+                        <li><b>Top website</b> — các website mua nhiều nhất.</li>
+                    </ul>
+                    <p><b>Xuất Excel:</b> xuất danh sách đơn hàng theo nhân viên đang chọn (admin có thể xuất tất cả nhân viên).</p>
+                </div>
+
+                <div class="gd-sec" id="gd-orders">
+                    <h3><span class="gd-num">2</span> Đơn hàng</h3>
+                    <p>Danh sách toàn bộ đơn hàng đồng bộ từ Basso (Thời gian, Mã đơn, Khách hàng, SĐT, Brand, Phân nhóm, Nhân viên, Website, Thành tiền).</p>
+                    <ul>
+                        <li><b>Bộ lọc:</b> Thời gian · Brand · Phân nhóm (có thêm mục <span class="gd-tag">Khách mới</span>) · Nhân viên. Ô tìm kiếm theo tên / SĐT / mã đơn.</li>
+                        <li><b>Doanh thu theo bộ lọc</b> (góc phải) — tổng tiền của các đơn đang hiển thị.</li>
+                        <li>Nhãn <span class="gd-tag">new</span> sau tên = khách mới (đơn đầu tiên toàn thời gian rơi vào kỳ). Chọn lọc phân nhóm = "Khách mới" để chỉ xem đơn của khách mới.</li>
+                        <li>Bấm <b>mã đơn</b> → mở chi tiết đơn trên Basso. Bấm <b>tên khách</b> → mở chi tiết khách trên Basso.</li>
+                    </ul>
+                    <div class="gd-sub">Import Excel</div>
+                    <p>Nạp file "Danh sách đơn hàng" xuất từ Basso — chi tiết ở mục <b>Nhập / Xuất Excel</b> bên dưới.</p>
+                    <div class="gd-sub">Xóa dữ liệu</div>
+                    <p>Xóa đơn theo khoảng ngày đặt; để trống cả hai ô = xóa toàn bộ. Khách không còn đơn nào sẽ bị xóa theo.</p>
+                    <div class="gd-note warn"><b>Lưu ý:</b> thao tác Xóa dữ liệu <b>không thể hoàn tác</b>.</div>
+                </div>
+
+                <div class="gd-sec" id="gd-customers">
+                    <h3><span class="gd-num">3</span> Khách hàng</h3>
+                    <p>Danh sách khách hàng. Tìm theo tên hoặc SĐT, lọc theo phân nhóm.</p>
+                    <p>Bấm vào một khách để mở <b>chi tiết khách hàng</b>:</p>
+                    <ul>
+                        <li>Thông tin: tên, SĐT, phân nhóm, nhân viên phụ trách.</li>
+                        <li>4 chỉ số: tổng đơn · doanh thu · trung bình/đơn · số website.</li>
+                        <li><b>Website quan tâm</b> — chip các website; bấm 1 chip để lọc số liệu &amp; biểu đồ theo website đó.</li>
+                        <li><b>Biểu đồ doanh thu</b> theo kỳ: 6 tháng · 12 tháng · Tất cả · Tùy chọn.</li>
+                        <li>Danh sách đơn gần đây. Bấm tên khách để mở khách đó trên Basso.</li>
+                    </ul>
+                </div>
+
+                <div class="gd-sec" id="gd-work">
+                    <h3><span class="gd-num">4</span> Công việc</h3>
+                    <p>Gồm 2 tab:</p>
+                    <ul>
+                        <li><b>Follow khách</b> — danh sách khách cần chăm sóc / theo dõi. Lọc theo người phụ trách, website, nhu cầu sản phẩm; tìm theo tên hoặc SĐT.</li>
+                        <li><b>Bàn giao</b> — giao việc giữa nhân viên, với cột Công việc, Ghi chú… (hiển thị đầy đủ nội dung, tự xuống dòng).</li>
+                    </ul>
+                </div>
+
+                <div class="gd-sec" id="gd-perm">
+                    <h3><span class="gd-num">5</span> Quản lý quyền</h3>
+                    <p><i>(Chỉ admin thấy mục này.)</i> Cấp / thu hồi quyền truy cập Deki cho nhân viên:</p>
+                    <ul>
+                        <li>Nhập <b>email basso.vn</b> của nhân viên.</li>
+                        <li>Gán các <b>nhân viên phụ trách</b> (chip) — quyết định người này thấy khách/đơn của ai.</li>
+                        <li>Chọn vai trò <b>admin</b> (thấy tất cả) hay <b>nhân viên thường</b> (chỉ thấy phần được gán).</li>
+                    </ul>
+                </div>
+
+                <div class="gd-sec" id="gd-import">
+                    <h3><span class="gd-num">6</span> Nhập / Xuất Excel</h3>
+                    <div class="gd-sub">Nhập (Import Excel)</div>
+                    <p>Dùng file <b>"Danh sách đơn hàng"</b> xuất từ Basso (các cột: Thời gian hoàn thành, Mã Đơn Hàng, Khách Hàng, Số điện thoại, Brand, Phân nhóm, Nhân viên, Website, Thành tiền…). Hệ thống tự động:</p>
+                    <ul>
+                        <li><b>Cập nhật đè</b> đơn đã có (theo mã đơn) và <b>thêm</b> đơn mới → import lại nhiều lần vẫn đúng.</li>
+                        <li><b>Sửa SĐT lỗi</b> dạng "00…" về "0…" nếu Basso không có số đó (giữ nguyên số "00…" nếu là khách thật trên Basso).</li>
+                        <li><b>Bỏ qua</b> cột "Lý do giảm giá" (không dùng trong Deki).</li>
+                    </ul>
+                    <div class="gd-note warn"><b>Lưu ý:</b> import chỉ <b>thêm / cập nhật</b>, không tự xóa đơn đã hủy bên Basso. Muốn số liệu sạch tuyệt đối cho một khoảng: <b>Xóa dữ liệu</b> khoảng đó rồi <b>import lại</b>.</div>
+                    <div class="gd-sub">Xuất (Xuất Excel)</div>
+                    <p>Ở Dashboard, bấm <b>Xuất Excel</b> để tải danh sách đơn theo nhân viên đang lọc.</p>
+                </div>
+
+                <div class="gd-note"><b>Mẹo:</b> Bấm nút <b>Thu gọn</b> ở dưới menu trái để mở rộng vùng làm việc. Bấm lại nút <b>Hướng dẫn</b> ở góc phải bất cứ lúc nào để xem lại tài liệu này.</div>
             </div>
         </div>
     </div>
