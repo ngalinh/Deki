@@ -20,13 +20,14 @@ async function resolveDevUser(req) {
     const override = ((req && (req.headers?.['x-dev-as'] || req.query?.devAs)) || DEV_AS || '')
         .toString().toLowerCase().trim();
     if (!override || override === (SUPER_ADMIN_EMAIL || 'dev@local')) return { ...DEV_USER };
-    let name = override, staffNames = [], isAdmin = false, found = false;
+    let name = override, staffNames = [], isAdmin = false, found = false, saleChannel = null;
     try {
-        const rows = await db.query('SELECT name, staff_name, is_admin FROM deki_permissions WHERE email = ?', [override]);
+        const rows = await db.query('SELECT name, staff_name, is_admin, sale_channel FROM deki_permissions WHERE email = ?', [override]);
         if (rows.length > 0) {
             found = true;
             name = rows[0].name || override;
             isAdmin = rows[0].is_admin === 1;
+            saleChannel = rows[0].sale_channel || null;
             const raw = rows[0].staff_name;
             if (raw) {
                 try { const p = JSON.parse(raw); staffNames = Array.isArray(p) ? p : [String(raw)]; }
@@ -34,7 +35,7 @@ async function resolveDevUser(req) {
             }
         }
     } catch {}
-    return { email: override, name, staffNames, roles: isAdmin ? ['admin'] : ['user'], isDekiAdmin: isAdmin, devNotFound: !found };
+    return { email: override, name, staffNames, saleChannel, roles: isAdmin ? ['admin'] : ['user'], isDekiAdmin: isAdmin, devNotFound: !found };
 }
 
 const sessionCache = new Map();
@@ -64,11 +65,12 @@ async function verifyBassoSession(cookieHeader) {
         const email = String(u.username).toLowerCase().trim();
 
         // Lấy thông tin từ DB permissions (tên hiển thị + DANH SÁCH tên nhân viên để filter)
-        let dbName = null, staffNames = [];
+        let dbName = null, staffNames = [], saleChannel = null;
         try {
-            const rows = await db.query('SELECT name, staff_name FROM deki_permissions WHERE email = ?', [email]);
+            const rows = await db.query('SELECT name, staff_name, sale_channel FROM deki_permissions WHERE email = ?', [email]);
             if (rows.length > 0) {
                 dbName = rows[0].name || null;
+                saleChannel = rows[0].sale_channel || null;
                 const raw = rows[0].staff_name;
                 if (raw) {
                     try {
@@ -83,6 +85,7 @@ async function verifyBassoSession(cookieHeader) {
             email,
             name: dbName || u.full_name || u.fullName || u.display_name || u.displayName || u.name || u.username,
             staffNames,
+            saleChannel,
             roles: Array.isArray(u.roles) ? u.roles : [],
             raw: u
         };

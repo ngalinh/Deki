@@ -423,7 +423,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
 // GET /api/permissions - list users
 app.get('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
-        const rows = await db.query('SELECT email, name, staff_name, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
+        const rows = await db.query('SELECT email, name, staff_name, sale_channel, is_admin, created_at FROM deki_permissions ORDER BY created_at DESC');
         // staff_name → mảng (tương thích ngược chuỗi đơn cũ)
         const data = rows.map(r => {
             let staffNames = [];
@@ -453,20 +453,25 @@ app.get('/api/employees', requireAuth(), requireAdmin(), async (req, res) => {
     }
 });
 
+// Mã kênh sale (khớp sale_channel của Basso Partner API)
+const SALE_CHANNELS = ['basso', 'linh_duong', 'linh_thao', 'keho_co', 'shipus', 'cty'];
+
 // POST /api/permissions - add/update user
 app.post('/api/permissions', requireAuth(), requireAdmin(), async (req, res) => {
     try {
-        const { email, name, staff_name, staff_names, is_admin } = req.body;
+        const { email, name, staff_name, staff_names, sale_channel, is_admin } = req.body;
         if (!email) return res.status(400).json({ success: false, error: 'Thiếu email' });
         const cleanEmail = String(email).toLowerCase().trim();
         // Hỗ trợ cả staff_names (mảng - mới) lẫn staff_name (chuỗi - cũ)
         let staffVal = null;
         if (Array.isArray(staff_names)) staffVal = staff_names.length ? JSON.stringify(staff_names) : null;
         else if (staff_name) staffVal = staff_name;
+        // Chỉ nhận mã kênh hợp lệ; rỗng/sai → NULL (không thuộc kênh nào)
+        const chanVal = SALE_CHANNELS.includes(String(sale_channel || '')) ? String(sale_channel) : null;
         await db.query(
-            `INSERT INTO deki_permissions (email, name, staff_name, is_admin) VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE name = VALUES(name), staff_name = VALUES(staff_name), is_admin = VALUES(is_admin)`,
-            [cleanEmail, name || null, staffVal, is_admin ? 1 : 0]
+            `INSERT INTO deki_permissions (email, name, staff_name, sale_channel, is_admin) VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name), staff_name = VALUES(staff_name), sale_channel = VALUES(sale_channel), is_admin = VALUES(is_admin)`,
+            [cleanEmail, name || null, staffVal, chanVal, is_admin ? 1 : 0]
         );
         clearSessionCache(); // để user nhìn thấy tên/quyền mới ngay
         res.json({ success: true });
@@ -1150,8 +1155,17 @@ app.get('/api/handover', requireAuth(), async (req, res) => {
         if (req.query.task) { where.push('task = ?'); params.push(req.query.task); }
         if (req.query.tinh_trang) { where.push('tinh_trang = ?'); params.push(req.query.tinh_trang); }
         if (req.query.nguoi_lam) { where.push('nguoi_lam = ?'); params.push(req.query.nguoi_lam); }
-        // Scope theo email: user chỉ thấy việc mình tạo; admin thấy tất cả.
-        if (!req.user.isDekiAdmin) { where.push('owner_email = ?'); params.push(req.user.email); }
+        // Scope: admin thấy tất cả. User thường thấy việc mình tạo + việc của mọi tài khoản
+        // CÙNG kênh sale (sale_channel). Chưa set kênh → chỉ thấy việc của mình như cũ.
+        if (!req.user.isDekiAdmin) {
+            if (req.user.saleChannel) {
+                where.push('(owner_email = ? OR owner_email IN (SELECT email FROM deki_permissions WHERE sale_channel = ?))');
+                params.push(req.user.email, req.user.saleChannel);
+            } else {
+                where.push('owner_email = ?');
+                params.push(req.user.email);
+            }
+        }
         const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
         const rows = await db.query(
             `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu, owner_email
