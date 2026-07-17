@@ -38,18 +38,21 @@ async function runMigrations() {
             console.error('[migrate] staff_name migration error:', e.message);
         }
 
-        // Migration: thêm cột sale_channel vào deki_permissions nếu chưa có
-        // (dùng để nhóm tài khoản: cùng kênh sale thì thấy Bàn giao của nhau)
+        // Migration: cột sale_channel trong deki_permissions (nhóm tài khoản: cùng kênh sale
+        // thì thấy Bàn giao của nhau). Lưu JSON mảng nhiều kênh → cần VARCHAR(255).
         try {
             const cols = await db.query(
-                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                `SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME = 'deki_permissions'
                    AND COLUMN_NAME = 'sale_channel'`
             );
             if (cols.length === 0) {
-                await pool.query(`ALTER TABLE deki_permissions ADD COLUMN sale_channel VARCHAR(32) AFTER staff_name`);
+                await pool.query(`ALTER TABLE deki_permissions ADD COLUMN sale_channel VARCHAR(255) AFTER staff_name`);
                 console.log('[migrate] Đã thêm cột sale_channel vào deki_permissions');
+            } else if (Number(cols[0].len) < 255) {
+                await pool.query(`ALTER TABLE deki_permissions MODIFY COLUMN sale_channel VARCHAR(255)`);
+                console.log('[migrate] Đã nới sale_channel lên VARCHAR(255) (chứa nhiều kênh)');
             }
         } catch (e) {
             console.error('[migrate] sale_channel migration error:', e.message);
