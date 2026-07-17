@@ -1155,6 +1155,21 @@ app.post('/api/follow-tags/delete', requireAuth(), async (req, res) => {
 
 // ===== CÔNG VIỆC: Bàn giao =====
 
+// Email các chủ việc mà user được phép xem/sửa/xóa: chính mình + mọi tài khoản có CHUNG
+// ít nhất 1 kênh sale. Chưa set kênh → chỉ mình. (sale_channel là JSON mảng nên đối chiếu
+// giao nhau ở JS; bảng permissions rất nhỏ.)
+async function handoverOwnerScope(user) {
+    const mine = user.saleChannels || [];
+    const emails = new Set([user.email]);
+    if (mine.length) {
+        const perms = await db.query('SELECT email, sale_channel FROM deki_permissions WHERE sale_channel IS NOT NULL');
+        perms.forEach(p => {
+            if (parseChannels(p.sale_channel).some(c => mine.includes(c))) emails.add(p.email);
+        });
+    }
+    return [...emails];
+}
+
 // GET /api/handover - list (filters: from, to, task, tinh_trang, nguoi_lam)
 app.get('/api/handover', requireAuth(), async (req, res) => {
     try {
@@ -1164,19 +1179,9 @@ app.get('/api/handover', requireAuth(), async (req, res) => {
         if (req.query.task) { where.push('task = ?'); params.push(req.query.task); }
         if (req.query.tinh_trang) { where.push('tinh_trang = ?'); params.push(req.query.tinh_trang); }
         if (req.query.nguoi_lam) { where.push('nguoi_lam = ?'); params.push(req.query.nguoi_lam); }
-        // Scope: admin thấy tất cả. User thường thấy việc mình tạo + việc của mọi tài khoản có
-        // CHUNG ít nhất 1 kênh sale. Chưa set kênh → chỉ thấy việc của mình như cũ.
-        // (sale_channel là JSON mảng nên đối chiếu giao nhau ở JS; bảng permissions rất nhỏ.)
+        // Scope: admin thấy tất cả; user thường thấy việc của mình + của tài khoản chung kênh sale.
         if (!req.user.isDekiAdmin) {
-            const mine = req.user.saleChannels || [];
-            const emails = new Set([req.user.email]);
-            if (mine.length) {
-                const perms = await db.query('SELECT email, sale_channel FROM deki_permissions WHERE sale_channel IS NOT NULL');
-                perms.forEach(p => {
-                    if (parseChannels(p.sale_channel).some(c => mine.includes(c))) emails.add(p.email);
-                });
-            }
-            const list = [...emails];
+            const list = await handoverOwnerScope(req.user);
             where.push(`owner_email IN (${list.map(() => '?').join(',')})`);
             params.push(...list);
         }
@@ -1214,8 +1219,13 @@ app.put('/api/handover/:id', requireAuth(), async (req, res) => {
     try {
         const b = req.body || {};
         const id = Number(req.params.id);
-        const ownerCond = req.user.isDekiAdmin ? '' : ' AND owner_email = ?';
-        const extraParams = req.user.isDekiAdmin ? [] : [req.user.email];
+        // Non-admin sửa được việc của mình + của tài khoản chung kênh sale.
+        let ownerCond = '', extraParams = [];
+        if (!req.user.isDekiAdmin) {
+            const list = await handoverOwnerScope(req.user);
+            ownerCond = ` AND owner_email IN (${list.map(() => '?').join(',')})`;
+            extraParams = list;
+        }
         await db.query(
             `UPDATE deki_handover_tasks SET ngay_thang=?, task=?, cong_viec=?, tinh_trang=?, nguoi_lam=?, ghi_chu=? WHERE id=?${ownerCond}`,
             [b.ngay_thang || null, b.task || null, b.cong_viec || null,
@@ -1234,7 +1244,12 @@ app.delete('/api/handover/:id', requireAuth(), async (req, res) => {
         if (req.user.isDekiAdmin) {
             await db.query(`DELETE FROM deki_handover_tasks WHERE id = ?`, [id]);
         } else {
-            await db.query(`DELETE FROM deki_handover_tasks WHERE id = ? AND owner_email = ?`, [id, req.user.email]);
+            // Non-admin xóa được việc của mình + của tài khoản chung kênh sale.
+            const list = await handoverOwnerScope(req.user);
+            await db.query(
+                `DELETE FROM deki_handover_tasks WHERE id = ? AND owner_email IN (${list.map(() => '?').join(',')})`,
+                [id, ...list]
+            );
         }
         res.json({ success: true });
     } catch (e) {
