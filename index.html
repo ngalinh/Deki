@@ -4955,11 +4955,10 @@
                 }
                 return true;
             });
-            // Khách "Đã mua hàng" luôn nằm CUỐI danh sách — tính cả 2 nguồn:
-            // bought (hệ thống tự khớp đơn) và tinh_trang chọn tay = "Đã mua hàng".
+            // CHỈ khách hệ thống TỰ chuyển "Đã mua hàng" (cờ bought = khớp SĐT với đơn thật)
+            // mới xuống cuối. Trạng thái "Đã mua hàng" chọn tay giữ nguyên vị trí.
             // Array.sort ổn định → thứ tự trong từng nhóm giữ nguyên như cũ.
-            const isDone = (c) => !!c.bought || (c.tinh_trang || '').trim() === 'Đã mua hàng';
-            rows.sort((a, b) => (isDone(a) ? 1 : 0) - (isDone(b) ? 1 : 0));
+            rows.sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0));
             if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có khách hàng nào</td></tr>';
                 return;
