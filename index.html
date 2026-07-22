@@ -4955,6 +4955,9 @@
                 }
                 return true;
             });
+            // Khách đã chuyển trạng thái "Đã mua hàng" luôn nằm CUỐI danh sách.
+            // Array.sort ổn định → thứ tự trong từng nhóm giữ nguyên như cũ.
+            rows.sort((a, b) => (a.bought ? 1 : 0) - (b.bought ? 1 : 0));
             if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:40px; color:var(--text-light);">Chưa có khách hàng nào</td></tr>';
                 return;
