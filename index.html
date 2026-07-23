@@ -1905,16 +1905,16 @@
 
             <div class="filters" style="margin-bottom: 20px;">
                 <h3 style="margin-bottom: 16px; font-size: 16px;">Thêm / cập nhật user</h3>
-                <div style="display: grid; grid-template-columns: 1.5fr 1fr 1.1fr 2fr auto auto; gap: 12px; align-items: end;">
-                    <div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: end;">
+                    <div style="flex: 1 1 190px; min-width: 175px;">
                         <label style="display: block; font-size: 11.5px; font-weight: 700; color: #7c8270; margin-bottom: 6px;">Email (basso.vn)</label>
                         <input type="email" id="permEmail" class="filter-select" style="width: 100%;" placeholder="user@basso.vn">
                     </div>
-                    <div>
+                    <div style="flex: 1 1 130px; min-width: 120px;">
                         <label style="display: block; font-size: 11.5px; font-weight: 700; color: #7c8270; margin-bottom: 6px;">Tên hiển thị</label>
                         <input type="text" id="permName" class="filter-select" style="width: 100%;" placeholder="VD: Linh">
                     </div>
-                    <div>
+                    <div style="flex: 1 1 165px; min-width: 150px;">
                         <label style="display: block; font-size: 11.5px; font-weight: 700; color: #7c8270; margin-bottom: 6px;">Kênh sale — chọn nhiều</label>
                         <div style="position:relative;">
                             <div id="permChanBox" class="chips-input" onclick="openPermChanDropdown(event)" style="min-height:36px; margin-bottom:0; cursor:pointer;">
@@ -1926,7 +1926,7 @@
                             </div>
                         </div>
                     </div>
-                    <div>
+                    <div style="flex: 2 1 220px; min-width: 200px;">
                         <label style="display: block; font-size: 11.5px; font-weight: 700; color: #7c8270; margin-bottom: 6px;">Tên nhân viên (trong Excel) — chọn nhiều</label>
                         <div style="position:relative;">
                             <div id="permStaffBox" class="chips-input" onclick="openPermStaffDropdown(event)" style="min-height:36px; margin-bottom:0;">
@@ -1938,12 +1938,12 @@
                             </div>
                         </div>
                     </div>
-                    <div>
+                    <div style="display: flex; align-items: end; gap: 14px; flex: 0 0 auto;">
                         <label style="display: flex; align-items: center; gap: 8px; height: 43px; font-size: 13px; font-weight: 600; color: #3a3d33; cursor: pointer; white-space: nowrap;">
                             <input type="checkbox" id="permAdmin" style="width:17px; height:17px; accent-color:#6f63e6; cursor:pointer;"> Admin
                         </label>
+                        <button onclick="savePermission()" style="height:43px; background:#23b3aa; color:#fff; border:none; border-radius:12px; padding:0 26px; font:700 13.5px 'Plus Jakarta Sans',sans-serif; cursor:pointer; box-shadow:0 8px 18px -10px rgba(35,179,170,.7); white-space:nowrap;">Lưu</button>
                     </div>
-                    <button onclick="savePermission()" style="height:43px; background:#23b3aa; color:#fff; border:none; border-radius:12px; padding:0 26px; font:700 13.5px 'Plus Jakarta Sans',sans-serif; cursor:pointer; box-shadow:0 8px 18px -10px rgba(35,179,170,.7);">Lưu</button>
                 </div>
                 <p style="color: #9aa08e; font-size: 12px; line-height: 1.5; margin-top: 12px;">
                     <strong style="color:#7c8270;">Tên nhân viên:</strong> tên trong cột "Nhân viên duyệt đơn" của Excel. Non-admin chỉ thấy đơn có nhân viên duyệt = tên này. Admin thấy tất cả đơn nên không cần map.<br>
