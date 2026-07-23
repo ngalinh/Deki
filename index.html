@@ -790,8 +790,8 @@
             .header-sub { font-size: 12.5px; }
             .header-actions { gap: 8px; }
             .hdr-user-name { display: none; }   /* chip user gọn lại còn avatar */
-            /* Title co lại để cụm nút (exit/actions) nằm cùng hàng, header không bị phình cao */
-            .header > div:not(.header-actions), .header > h2 { min-width: 0; }
+            /* Title basis 0 → không đẩy cụm nút xuống dòng dưới (flex-wrap tính line-break theo basis) */
+            .header > div:not(.header-actions), .header > h2 { flex: 1 1 0; min-width: 0; }
             .header-actions { flex-shrink: 0; }
             /* Đơn hàng: nút Xóa/Import chỉ còn icon trên mobile cho gọn */
             #adminActions .btn-txt { display: none; }
@@ -1918,7 +1918,6 @@
                 </button>
                 <div>
                     <h2>Quản lý quyền</h2>
-                    <p class="header-sub">Cấp/thu hồi quyền truy cập Deki cho nhân viên</p>
                 </div>
                 <div class="header-actions">
                     <button class="exit-btn" onclick="goToBassoDashboard()" title="Về Dashboard Basso" aria-label="Về Dashboard Basso">
@@ -2003,7 +2002,6 @@
                 </button>
                 <div>
                     <h2>Công việc</h2>
-                    <p class="header-sub">Quản lý follow khách & bàn giao công việc</p>
                 </div>
                 <div class="header-actions">
                     <button class="exit-btn" onclick="goToBassoDashboard()" title="Về Dashboard Basso" aria-label="Về Dashboard Basso">
