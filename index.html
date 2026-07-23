@@ -783,15 +783,16 @@
             .sidebar-overlay.show { opacity: 1; visibility: visible; }
 
             /* Header gọn */
-            .header { padding: 16px 18px; border-radius: 18px; flex-wrap: wrap; gap: 10px; }
+            .header { padding: 16px 18px; border-radius: 18px; flex-wrap: nowrap; gap: 10px; }
             #adminActions .btn { padding: 7px 12px; font-size: 12px; gap: 6px; }
             #adminActions .btn svg { width: 15px; height: 15px; }
             .header h2 { font-size: 20px; }
             .header-sub { font-size: 12.5px; }
             .header-actions { gap: 8px; }
             .hdr-user-name { display: none; }   /* chip user gọn lại còn avatar */
-            /* Title basis 0 → không đẩy cụm nút xuống dòng dưới (flex-wrap tính line-break theo basis) */
-            .header > div:not(.header-actions), .header > h2 { flex: 1 1 0; min-width: 0; }
+            /* Header 1 hàng (nowrap): title co lại (ellipsis) nếu thiếu chỗ; cụm nút margin-left:auto canh phải */
+            .header > div:not(.header-actions), .header > h2 { min-width: 0; }
+            .header h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .header-actions { flex-shrink: 0; }
             /* Đơn hàng: nút Xóa/Import chỉ còn icon trên mobile cho gọn */
             #adminActions .btn-txt { display: none; }
