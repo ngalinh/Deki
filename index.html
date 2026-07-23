@@ -1330,6 +1330,9 @@
                         <span class="nm hdr-user-name"></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8c9281" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                     </div>
+                    <button class="exit-btn" onclick="goToBassoDashboard()" title="Về Dashboard Basso" aria-label="Về Dashboard Basso">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
                 </div>
             </div>
 
@@ -3307,6 +3310,9 @@
         function openGuide() { document.getElementById('guideModal').classList.add('active'); }
         function closeGuide() { document.getElementById('guideModal').classList.remove('active'); }
         function gdScroll(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        // Thoát Deki, quay về Dashboard nền tảng Basso
+        const BASSO_DASHBOARD_URL = 'https://ai.basso.vn/platform';
+        function goToBassoDashboard() { window.location.href = BASSO_DASHBOARD_URL; }
         async function confirmDeleteData() {
             const from = document.getElementById('delFrom').value;
             const to = document.getElementById('delTo').value;
@@ -6189,6 +6195,8 @@
         .guide-btn { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; border-radius:50%; background:linear-gradient(160deg,rgba(255,255,255,.6),rgba(255,255,255,.3)); border:1px solid #e3e6d8; color:#6f7566; cursor:pointer; transition:all .15s; }
         .guide-btn:hover { border-color:#6f63e6; color:#6f63e6; box-shadow:0 3px 12px rgba(111,99,230,.14); }
         .guide-btn svg { stroke:currentColor; }
+        .exit-btn { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; border-radius:50%; background:linear-gradient(160deg,rgba(255,255,255,.6),rgba(255,255,255,.3)); border:1px solid #e3e6d8; color:#6f7566; cursor:pointer; transition:all .15s; }
+        .exit-btn:hover { border-color:#c0432f; color:#c0432f; box-shadow:0 3px 12px rgba(192,67,47,.14); }
         #guideModal .modal-content { max-width: 880px; }
         .gd-body { padding: 18px 26px 30px; }
         .gd-intro { font-size:13.5px; color:#5f655a; line-height:1.62; margin-bottom:16px; }
