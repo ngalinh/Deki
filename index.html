@@ -2129,7 +2129,7 @@
                                     <th>Task</th>
                                     <th>Công việc</th>
                                     <th>Tình trạng</th>
-                                    <th>Kênh sale</th>
+                                    <th>Người tạo</th>
                                     <th>Người làm</th>
                                     <th>Ghi chú</th>
                                     <th></th>
@@ -5396,10 +5396,7 @@
                         ? `<span class="badge" style="background:${tc.bg}; border-color:${tc.border}; color:${tc.color};">${t.task}</span>`
                         : `<span class="badge">${t.task}</span>`
                     : '-';
-                const chans = t.owner_sale_channels || [];
-                const chanCell = chans.length
-                    ? chans.map(c => `<span class="row-tag">${saleChannelName(c) || c}</span>`).join('')
-                    : '<span style="color: var(--text-light);">—</span>';
+                const creatorCell = t.owner_name || (t.owner_email ? t.owner_email.split('@')[0] : '—');
                 return `
                     <tr>
                         <td>${i + 1}</td>
@@ -5407,7 +5404,7 @@
                         <td>${taskBadge}</td>
                         <td style="color:var(--text-gray); max-width:340px; min-width:200px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.cong_viec || '-'}</td>
                         <td>${statusBadge}</td>
-                        <td>${chanCell}</td>
+                        <td style="color:var(--text-gray);">${creatorCell}</td>
                         <td style="color:var(--text-gray);">${t.nguoi_lam || '-'}</td>
                         <td style="color:var(--text-gray); max-width:220px; min-width:140px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.ghi_chu || '-'}</td>
                         <td style="white-space:nowrap;">
