@@ -2126,11 +2126,11 @@
                                 <tr>
                                     <th>STT</th>
                                     <th>Ngày tháng</th>
-                                    <th>Task</th>
+                                    <th style="text-align:center;">Task</th>
                                     <th>Công việc</th>
                                     <th>Tình trạng</th>
-                                    <th>Người tạo</th>
-                                    <th>Người làm</th>
+                                    <th style="text-align:center;">Người tạo</th>
+                                    <th style="text-align:center;">Người làm</th>
                                     <th>Ghi chú</th>
                                     <th></th>
                                 </tr>
@@ -5401,11 +5401,11 @@
                     <tr>
                         <td>${i + 1}</td>
                         <td style="color:var(--text-gray);">${fmtDateVN(t.ngay_thang) || '-'}</td>
-                        <td>${taskBadge}</td>
+                        <td style="text-align:center;">${taskBadge}</td>
                         <td style="color:var(--text-gray); max-width:340px; min-width:200px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.cong_viec || '-'}</td>
                         <td>${statusBadge}</td>
-                        <td style="color:var(--text-gray);">${creatorCell}</td>
-                        <td style="color:var(--text-gray);">${t.nguoi_lam || '-'}</td>
+                        <td style="color:var(--text-gray); text-align:center;">${creatorCell}</td>
+                        <td style="color:var(--text-gray); text-align:center;">${t.nguoi_lam || '-'}</td>
                         <td style="color:var(--text-gray); max-width:220px; min-width:140px; white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.45;">${t.ghi_chu || '-'}</td>
                         <td style="white-space:nowrap;">
                             <button class="btn btn-secondary" style="padding:6px 10px; font-size:12px;" onclick="openHandoverModal(${t.id})">Sửa</button>
