@@ -1187,11 +1187,12 @@ app.get('/api/handover', requireAuth(), async (req, res) => {
         }
         const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
         const rows = await db.query(
-            `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu, owner_email
+            `SELECT id, DATE_FORMAT(ngay_thang,'%Y-%m-%d') AS ngay_thang, task, cong_viec, tinh_trang, nguoi_lam, ghi_chu, owner_email,
+                    (SELECT sale_channel FROM deki_permissions WHERE email = deki_handover_tasks.owner_email) AS owner_sale_channel
              FROM deki_handover_tasks ${whereSql} ORDER BY ngay_thang DESC, id DESC`,
             params
         );
-        res.json({ success: true, data: rows });
+        res.json({ success: true, data: rows.map(r => ({ ...r, owner_sale_channels: parseChannels(r.owner_sale_channel) })) });
     } catch (e) {
         console.error('[api/handover] error:', e);
         res.status(500).json({ success: false, error: e.message });
