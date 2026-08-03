@@ -318,7 +318,12 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 }
             }
 
-            const numAt = (i) => (i !== -1 && row[i] != null && row[i] !== '') ? (Number(row[i]) || 0) : 0;
+            // Parse số: bỏ dấu phẩy ngăn cách nghìn ("735,372" → 735372), giữ dấu chấm thập phân.
+            const numAt = (i) => {
+                if (i === -1 || row[i] == null || row[i] === '') return 0;
+                const n = Number(String(row[i]).replace(/[^\d.-]/g, ''));
+                return Number.isFinite(n) ? n : 0;
+            };
             orders.push({
                 customerKey: key,
                 code: colIdx.code !== -1 && row[colIdx.code] ? String(row[colIdx.code]).trim() : null,
@@ -332,7 +337,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 phuThu: numAt(colIdx.phuThu),
                 giamGia: numAt(colIdx.giamGia),
                 lyDoGiamGia: null, // Cột "Lý do giảm giá" không dùng trên Deki → bỏ qua giá trị (tránh lỗi "Data too long" khi giá trị dài)
-                amount: Number(row[colIdx.total]) || 0
+                amount: numAt(colIdx.total)
             });
         }
 
