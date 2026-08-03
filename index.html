@@ -2331,7 +2331,7 @@
                         <div>${order.website || '-'}</div>
                         <div class="order-date">${order.date || '-'}</div>
                     </div>
-                    <span class="order-amount">${order.amount.toLocaleString('vi-VN')} đ</span>
+                    <span class="order-amount">${order.amount.toLocaleString('en-US')} đ</span>
                     <span class="badge khach-le" style="font-size: 12px;">${order.brand || '-'}</span>
                 </div>
             `).join('');
@@ -2450,7 +2450,7 @@
                         <div class="order-info">
                             <div style="color: var(--text-gray); font-size: 13px;">${hasStats ? w.orders + ' đơn' : ''}</div>
                         </div>
-                        <span class="order-amount">${hasStats ? w.revenue.toLocaleString('vi-VN') + ' đ' : '-'}</span>
+                        <span class="order-amount">${hasStats ? w.revenue.toLocaleString('en-US') + ' đ' : '-'}</span>
                         <span></span>
                     </div>
                 `;
@@ -2470,7 +2470,7 @@
             const websites = (customer.websites || []).filter(w => w && w !== 'N/A');
             const unit = (u) => ` <span style="font-size:12px;color:#8c9281;">${u}</span>`;
 
-            document.getElementById('modalOrders').textContent = orders.toLocaleString('vi-VN');
+            document.getElementById('modalOrders').textContent = orders.toLocaleString('en-US');
             document.getElementById('modalRevenue').innerHTML = revenue >= 1e9
                 ? (revenue / 1e9).toFixed(2).replace('.', ',') + unit('tỷ')
                 : (revenue / 1e6).toFixed(1).replace('.', ',') + unit('tr');
@@ -2479,7 +2479,7 @@
                 : '0';
             document.getElementById('modalWebsites').textContent = websites.length;
             const ot = document.getElementById('cdOrderTotal');
-            if (ot) ot.textContent = orders.toLocaleString('vi-VN');
+            if (ot) ot.textContent = orders.toLocaleString('en-US');
 
             // Website chips: bấm để LỌC modal theo website (bấm lại để bỏ); chip đang lọc tô periwinkle
             const wl = document.getElementById('modalWebsiteList');
@@ -2512,7 +2512,7 @@
                     return `<div style="display:flex; flex-direction:column; gap:5px; padding:13px 16px; ${border}">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                             <span style="font:700 13px 'Plus Jakarta Sans'; color:#6155cf;">${codeHtml}</span>
-                            <span style="font-weight:800; font-size:13.5px; white-space:nowrap;">${(o.amount || 0).toLocaleString('vi-VN')} đ</span>
+                            <span style="font-weight:800; font-size:13.5px; white-space:nowrap;">${(o.amount || 0).toLocaleString('en-US')} đ</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:9px; font-size:11.5px; color:#9aa08e;">
                             <span style="flex:1; min-width:0; color:#5f655a; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${o.website ? webName(o.website) : '-'}</span>
@@ -2636,7 +2636,7 @@
                         responsive: true, maintainAspectRatio: false,
                         plugins: {
                             legend: { display: false },
-                            tooltip: { backgroundColor: '#25271f', padding: 10, titleColor: '#23b3aa', bodyColor: '#fff', displayColors: false, callbacks: { label: (c3) => c3.parsed.y.toLocaleString('vi-VN') + ' ' + custUnit } }
+                            tooltip: { backgroundColor: '#25271f', padding: 10, titleColor: '#23b3aa', bodyColor: '#fff', displayColors: false, callbacks: { label: (c3) => c3.parsed.y.toLocaleString('en-US') + ' ' + custUnit } }
                         },
                         scales: {
                             y: { beginAtZero: true, ticks: { display: true, color: '#9aa08e', font: { weight: 600, size: 11 }, maxTicksLimit: 5, padding: 6, callback: (v) => v + ' ' + custUnit }, border: { display: false }, grid: { color: '#eef0e6' } },
@@ -2773,7 +2773,7 @@
                 return `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;">
                     <span style="width:9px;height:9px;border-radius:3px;background:${color};flex:none;"></span>
                     <span style="font-weight:600;color:#4a5043;flex:1;">${nm}</span>
-                    <span style="color:var(--text-light);font-weight:600;margin-right:6px;">${counts[i].toLocaleString('vi-VN')}</span>
+                    <span style="color:var(--text-light);font-weight:600;margin-right:6px;">${counts[i].toLocaleString('en-US')}</span>
                     <span style="font-weight:700;">${pct}%</span>
                 </div>`;
             }).join('');
@@ -2787,7 +2787,7 @@
                             </g>
                         </svg>
                         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                            <span style="font-size:22px;font-weight:800;letter-spacing:-.02em;">${total.toLocaleString('vi-VN')}</span>
+                            <span style="font-size:22px;font-weight:800;letter-spacing:-.02em;">${total.toLocaleString('en-US')}</span>
                             <span style="font-size:10.5px;color:#9aa08e;font-weight:600;">khách hàng</span>
                         </div>
                     </div>
@@ -2809,7 +2809,7 @@
                     <div style="flex:1;height:12px;background:#f1f2e8;border-radius:999px;overflow:hidden;">
                         <div class="web-bar-fill" style="width:${Math.max(2, Math.round(val / max * 100))}%;height:100%;background:${isTop ? '#6f63e6' : '#23b3aa'};border-radius:999px;transform-origin:left;"></div>
                     </div>
-                    <span style="width:56px;flex:none;text-align:right;font-size:12.5px;font-weight:700;">${val.toLocaleString('vi-VN')}</span>
+                    <span style="width:56px;flex:none;text-align:right;font-size:12.5px;font-weight:700;">${val.toLocaleString('en-US')}</span>
                 </div>`;
             const rows = names.map((nm, i) => row(nm, orders[i], orders[i] === max));
             const half = Math.ceil(rows.length / 2);
@@ -3032,7 +3032,7 @@
                             displayColors: false,
                             callbacks: {
                                 label: function(context) {
-                                    return context.parsed.y.toLocaleString('vi-VN') + ' tỷ';
+                                    return context.parsed.y.toLocaleString('en-US') + ' tỷ';
                                 }
                             }
                         }
@@ -3152,8 +3152,8 @@
                                 label: function(context) {
                                     const revenue = websiteData.revenue[context.dataIndex];
                                     return [
-                                        'Đơn hàng: ' + context.parsed.x.toLocaleString('vi-VN'),
-                                        'Doanh thu: ' + (revenue / 1000000).toLocaleString('vi-VN') + ' triệu đ'
+                                        'Đơn hàng: ' + context.parsed.x.toLocaleString('en-US'),
+                                        'Doanh thu: ' + (revenue / 1000000).toLocaleString('en-US') + ' triệu đ'
                                     ];
                                 }
                             }
@@ -3167,7 +3167,7 @@
                             },
                             ticks: {
                                 callback: function(value) {
-                                    return value.toLocaleString('vi-VN');
+                                    return value.toLocaleString('en-US');
                                 }
                             }
                         },
@@ -3357,7 +3357,7 @@
             try {
                 const r = await apiDelete(url);
                 closeDeleteDataModal();
-                const n = (r && typeof r.deleted === 'number') ? ` (${r.deleted.toLocaleString('vi-VN')} đơn)` : '';
+                const n = (r && typeof r.deleted === 'number') ? ` (${r.deleted.toLocaleString('en-US')} đơn)` : '';
                 showToast('success', 'Đã xóa', msg + n);
                 await loadCustomersFromAPI();
                 await refreshAll();
@@ -3482,7 +3482,7 @@
                     <tr onclick="showCustomerDetail('${customer.id}')">
                         <td class="customer-name">${clampName(customer.name)}</td>
                         <td><span class="badge ${segmentClass}">${customer.segment}</span></td>
-                        <td style="font-weight:600;">${customer.revenue.toLocaleString('vi-VN')} đ</td>
+                        <td style="font-weight:600;">${customer.revenue.toLocaleString('en-US')} đ</td>
                         <td>${customer.orders}</td>
                         <td style="color: var(--text-gray);">${lastOrder ? fmtDateVN(lastOrder) : '-'}</td>
                     </tr>
@@ -3622,7 +3622,7 @@
             advCurrentPage = 1;
             document.getElementById('advEmptyState').style.display = 'none';
             document.getElementById('advResultContainer').style.display = 'block';
-            document.getElementById('advResultCount').textContent = advFilteredCustomers.length.toLocaleString('vi-VN');
+            document.getElementById('advResultCount').textContent = advFilteredCustomers.length.toLocaleString('en-US');
             renderAdvancedResults();
         }
 
@@ -3654,8 +3654,8 @@
                         <td><span class="badge ${segmentClass}">${c.segment || '-'}</span></td>
                         <td style="font-size: 13px; color: var(--text-gray);">${brandsText}</td>
                         <td style="font-size: 13px; color: var(--text-gray);" title="${employees.join(', ')}">${employeesText}</td>
-                        <td>${c.orders.toLocaleString('vi-VN')}</td>
-                        <td>${c.revenue.toLocaleString('vi-VN')} đ</td>
+                        <td>${c.orders.toLocaleString('en-US')}</td>
+                        <td>${c.revenue.toLocaleString('en-US')} đ</td>
                         <td class="websites-tag">
                             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <circle cx="12" cy="12" r="10"></circle>
@@ -3773,7 +3773,7 @@
                 const empName = (empEl && empEl.value) ? empEl.value : 'TatCa';
                 const safe = empName.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '') || 'TatCa';
                 XLSX.writeFile(wb, `Deki_DonHang_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                showToast('success', 'Xuất file thành công', `Đã tải ${rows.length.toLocaleString('vi-VN')} đơn`);
+                showToast('success', 'Xuất file thành công', `Đã tải ${rows.length.toLocaleString('en-US')} đơn`);
             } catch (e) {
                 showToast('error', 'Lỗi xuất Excel', e.message);
             }
@@ -3850,7 +3850,7 @@
         // Update customer count
         function setCustHeaderCount(n) {
             const el = document.querySelector('#customers-view .header p');
-            if (el) el.textContent = `${(n || 0).toLocaleString('vi-VN')} khách hàng`;
+            if (el) el.textContent = `${(n || 0).toLocaleString('en-US')} khách hàng`;
         }
 
         function updateCustomerCount() {
@@ -4132,9 +4132,9 @@
                         <td class="customer-name">${clampName(r.name)}</td>
                         ${segBadge}
                         <td>${webChips}</td>
-                        <td style="text-align:right; font-weight:700;">${r.orders.toLocaleString('vi-VN')}</td>
-                        <td style="text-align:right; font-weight:700;">${r.revenue.toLocaleString('vi-VN')} đ</td>
-                        <td style="text-align:right; color:var(--text-gray);">${Math.round(r.avg).toLocaleString('vi-VN')} đ</td>
+                        <td style="text-align:right; font-weight:700;">${r.orders.toLocaleString('en-US')}</td>
+                        <td style="text-align:right; font-weight:700;">${r.revenue.toLocaleString('en-US')} đ</td>
+                        <td style="text-align:right; color:var(--text-gray);">${Math.round(r.avg).toLocaleString('en-US')} đ</td>
                         <td style="text-align:right; color:var(--text-gray);">${r.lastOrder ? fmtDateVN(r.lastOrder) : '-'}</td>
                     </tr>`;
             }).join('');
@@ -4277,16 +4277,16 @@
         function renderOrdersTable(r) {
             const tbody = document.getElementById('ordersTableBody');
             const rows = r.data || [];
-            document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('vi-VN') + ' đơn hàng';
+            document.getElementById('ordersCount').textContent = (r.total || 0).toLocaleString('en-US') + ' đơn hàng';
             const revEl = document.getElementById('ordRevenue');
-            if (revEl) revEl.textContent = (r.totalRevenue || 0).toLocaleString('vi-VN') + ' đ';
+            if (revEl) revEl.textContent = (r.totalRevenue || 0).toLocaleString('en-US') + ' đ';
             if (rows.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:var(--text-light);">Không có đơn hàng</td></tr>';
                 document.getElementById('ordPaginationInfo').textContent = '';
                 document.getElementById('ordPaginationControls').innerHTML = '';
                 return;
             }
-            const num = (v) => v ? Number(v).toLocaleString('vi-VN') : '-';
+            const num = (v) => v ? Number(v).toLocaleString('en-US') : '-';
             tbody.innerHTML = rows.map(o => `
                 <tr>
                     <td style="color:var(--text-gray); white-space:nowrap;">${o.date || '-'}</td>
@@ -4298,7 +4298,7 @@
                     <td style="color:var(--text-gray);">${o.sale_channel ? (saleChannelName(o.sale_channel) || o.sale_channel) : '-'}</td>
                     <td style="color:var(--text-gray);">${o.employee || '-'}</td>
                     <td style="color:var(--text-gray);">${o.website ? webName(o.website) : '-'}</td>
-                    <td style="font-weight:700; white-space:nowrap; text-align:right;">${(o.amount || 0).toLocaleString('vi-VN')} đ</td>
+                    <td style="font-weight:700; white-space:nowrap; text-align:right;">${(o.amount || 0).toLocaleString('en-US')} đ</td>
                 </tr>`).join('');
 
             // Pagination
@@ -4306,7 +4306,7 @@
             const totalPages = Math.ceil(total / pageSize);
             const start = (page - 1) * pageSize + 1;
             const end = Math.min(page * pageSize, total);
-            document.getElementById('ordPaginationInfo').textContent = `Hiển thị ${start}-${end} trong ${total.toLocaleString('vi-VN')} đơn hàng`;
+            document.getElementById('ordPaginationInfo').textContent = `Hiển thị ${start}-${end} trong ${total.toLocaleString('en-US')} đơn hàng`;
 
             // Phân trang nút tròn (khớp folder)
             const controls = document.getElementById('ordPaginationControls');
@@ -4725,7 +4725,7 @@
             if (amount >= 1e9) return (amount / 1e9).toFixed(2).replace('.', ',') + ' tỷ';
             if (amount >= 1e6) return (amount / 1e6).toFixed(1).replace('.', ',') + 'M đ';
             if (amount >= 1e3) return (amount / 1e3).toFixed(0) + 'K đ';
-            return amount.toLocaleString('vi-VN') + ' đ';
+            return amount.toLocaleString('en-US') + ' đ';
         }
         // Như formatMoney nhưng đơn vị (tỷ/M/K/đ) là span nhỏ inline (khớp thiết kế stat card)
         function formatMoneyHTML(amount) {
@@ -4733,7 +4733,7 @@
             if (amount >= 1e9) return wrap((amount / 1e9).toFixed(2).replace('.', ','), 'tỷ');
             if (amount >= 1e6) return wrap((amount / 1e6).toFixed(1).replace('.', ','), 'M đ');
             if (amount >= 1e3) return wrap((amount / 1e3).toFixed(0), 'K đ');
-            return wrap(amount.toLocaleString('vi-VN'), 'đ');
+            return wrap(amount.toLocaleString('en-US'), 'đ');
         }
 
         // Render trend HTML (icon up/down + % + text)
@@ -5722,7 +5722,7 @@
                                 <span>${webName(w.name)}</span>
                             </div>
                             <div style="text-align: right;">
-                                <div style="font-weight: 600; color: var(--primary);">${w.orders.toLocaleString('vi-VN')} đơn</div>
+                                <div style="font-weight: 600; color: var(--primary);">${w.orders.toLocaleString('en-US')} đơn</div>
                                 <div style="font-size: 12px; color: var(--text-gray);">${formatMoney(w.revenue)}</div>
                             </div>
                         </div>
@@ -5806,7 +5806,7 @@
                                         <div style="font-weight: 600;">${c.name}</div>
                                         <div style="font-size: 12px; color: var(--text-gray); display: flex; align-items: center; gap: 8px;">
                                             <span class="badge ${segmentClass}" style="font-size: 11px; padding: 2px 8px;">${c.segment || '-'}</span>
-                                            <span>${c.orders.toLocaleString('vi-VN')} đơn</span>
+                                            <span>${c.orders.toLocaleString('en-US')} đơn</span>
                                         </div>
                                     </div>
                                 </div>
@@ -5823,7 +5823,7 @@
             if (!el) return;
             target = Number(target) || 0;
             dur = dur || 900;
-            const fmt = (v) => Math.round(v).toLocaleString('vi-VN');
+            const fmt = (v) => Math.round(v).toLocaleString('en-US');
             if (target <= 0) { el.textContent = fmt(0); return; }
             const start = performance.now();
             function step(now) {
@@ -5848,16 +5848,16 @@
         function renderDashboardStats() {
             const stats = calculateDashboardStats(dashboardRange);
 
-            document.getElementById('statTotalCustomers').textContent = stats.totalCustomers.toLocaleString('vi-VN');
-            document.getElementById('statTotalOrders').textContent = stats.totalOrders.toLocaleString('vi-VN');
+            document.getElementById('statTotalCustomers').textContent = stats.totalCustomers.toLocaleString('en-US');
+            document.getElementById('statTotalOrders').textContent = stats.totalOrders.toLocaleString('en-US');
             document.getElementById('statTotalRevenue').innerHTML = formatMoneyHTML(stats.totalRevenue);
             const webTotEl = document.getElementById('websiteTotalOrders');
-            if (webTotEl) webTotEl.textContent = `Tổng ${(stats.totalOrders || 0).toLocaleString('vi-VN')} đơn`;
+            if (webTotEl) webTotEl.textContent = `Tổng ${(stats.totalOrders || 0).toLocaleString('en-US')} đơn`;
 
             // Khách mới
             const newCustEl = document.getElementById('statNewCustomers');
             const newCustNote = document.getElementById('newCustomersNote');
-            if (newCustEl) newCustEl.textContent = (stats.newCustomers || 0).toLocaleString('vi-VN');
+            if (newCustEl) newCustEl.textContent = (stats.newCustomers || 0).toLocaleString('en-US');
             if (newCustNote) {
                 // Nhãn pill gọn theo kỳ: Tháng → "Tháng M/YYYY", Năm → "Năm YYYY", Tuần → ẩn
                 const period = document.getElementById('dashPeriod')?.value || 'all';
