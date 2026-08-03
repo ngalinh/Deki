@@ -832,6 +832,7 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
         if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }
         if (req.query.brand) { where.push('o.brand = ?'); params.push(req.query.brand); }
+        if (req.query.saleChannel) { where.push('o.sale_channel = ?'); params.push(req.query.saleChannel); }
         if (req.query.segment === '__new__') {
             // Lọc "Khách mới": chỉ đơn của khách mới, KHÔNG lọc theo segment thật.
             where.push(`c.id IN (${newSubSql})`); params.push(...newSubParams);

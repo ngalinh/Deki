@@ -1679,6 +1679,15 @@
                 <select class="filter-select" id="ordEmployee" onchange="loadOrders(1)">
                     <option value="">Tất cả nhân viên</option>
                 </select>
+                <select class="filter-select" id="ordSaleChannel" onchange="loadOrders(1)">
+                    <option value="">Tất cả kênh sale</option>
+                    <option value="basso">Basso</option>
+                    <option value="linh_duong">Linh Dương</option>
+                    <option value="linh_thao">Linh Thảo</option>
+                    <option value="keho_co">Kênh CO</option>
+                    <option value="shipus">ShipUS</option>
+                    <option value="cty">Cty</option>
+                </select>
                 <div id="ordCustomRange" style="display:none; gap:8px; align-items:center;">
                     <input type="date" id="ordFrom" class="filter-select">
                     <span style="color:var(--text-light);">→</span>
@@ -4257,6 +4266,8 @@
             if (brand) params.set('brand', brand);
             const segment = document.getElementById('ordSegment')?.value;
             if (segment) params.set('segment', segment);
+            const saleChannel = document.getElementById('ordSaleChannel')?.value;
+            if (saleChannel) params.set('saleChannel', saleChannel);
             const timeVal = document.getElementById('ordTime').value;
             let range = null;
             if (timeVal === 'custom') {
