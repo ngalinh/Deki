@@ -124,7 +124,8 @@ async function runMigrations() {
                 ['ship_quoc_te', "DECIMAL(18,2) DEFAULT 0"],
                 ['phu_thu', "DECIMAL(18,2) DEFAULT 0"],
                 ['giam_gia', "DECIMAL(18,2) DEFAULT 0"],
-                ['ly_do_giam_gia', "VARCHAR(255)"]
+                ['ly_do_giam_gia', "VARCHAR(255)"],
+                ['sale_channel', "VARCHAR(32)"]
             ];
             const existing = (await db.query(
                 `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS

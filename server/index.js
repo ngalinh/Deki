@@ -252,6 +252,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
             brand: headers.findIndex(h => h === 'brand'),
             segment: headers.findIndex(h => h.includes('phân nhóm')),
             employee: headers.findIndex(h => h.includes('nhân viên')),
+            saleChannel: headers.findIndex(h => h.includes('kênh sale')),
             website: headers.findIndex(h => h === 'website'),
             tyGia: headers.findIndex(h => h.includes('tỷ giá') || h.includes('tỉ giá')),
             shipQt: headers.findIndex(h => h.includes('ship quốc tế')),
@@ -263,6 +264,9 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
         if (colIdx.customer === -1 || colIdx.total === -1) {
             return res.status(400).json({ success: false, error: 'Thiếu cột bắt buộc (Khách Hàng, Thành tiền)' });
         }
+        // Map tên kênh sale hiển thị trong file → mã chuẩn (khớp sale_channel Basso). Không khớp → null.
+        const CHAN_MAP = { 'basso': 'basso', 'linh dương': 'linh_duong', 'linh thảo': 'linh_thao', 'kênh co': 'keho_co', 'shipus': 'shipus', 'cty': 'cty' };
+        const toChanCode = (v) => CHAN_MAP[String(v == null ? '' : v).trim().toLowerCase()] || null;
 
         const dataRows = rows.slice(headerRowIndex + 1).filter(r => r && r[colIdx.customer]);
 
@@ -322,6 +326,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 website: colIdx.website !== -1 && row[colIdx.website] ? String(row[colIdx.website]).trim() : null,
                 brand: colIdx.brand !== -1 && row[colIdx.brand] ? String(row[colIdx.brand]).trim() : null,
                 employee: colIdx.employee !== -1 && row[colIdx.employee] ? String(row[colIdx.employee]).trim() : null,
+                saleChannel: colIdx.saleChannel !== -1 ? toChanCode(row[colIdx.saleChannel]) : null,
                 tyGia: numAt(colIdx.tyGia),
                 shipQt: numAt(colIdx.shipQt),
                 phuThu: numAt(colIdx.phuThu),
@@ -360,15 +365,15 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                 for (const o of batch) {
                     const cid = idMap.get(o.customerKey);
                     if (!cid) continue;
-                    placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                    values.push(cid, o.code, o.date, o.website, o.brand, o.employee,
+                    placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                    values.push(cid, o.code, o.date, o.website, o.brand, o.employee, o.saleChannel,
                         o.tyGia, o.shipQt, o.phuThu, o.giamGia, o.lyDoGiamGia, o.amount);
                 }
                 if (placeholders.length > 0) {
                     // UPSERT theo order_code: đơn đã có sẽ được cập nhật lại (ngày hoàn thành,
                     // thành tiền, nhân viên... có thể đổi giữa các lần xuất) → tránh dữ liệu kẹt.
                     const sql = `INSERT INTO deki_orders
-                        (customer_id, order_code, order_date, website, brand, employee,
+                        (customer_id, order_code, order_date, website, brand, employee, sale_channel,
                          ty_gia, ship_quoc_te, phu_thu, giam_gia, ly_do_giam_gia, amount)
                         VALUES ${placeholders.join(', ')}
                         ON DUPLICATE KEY UPDATE
@@ -377,6 +382,7 @@ app.post('/api/customers/import', requireAuth(), requireAdmin(), upload.single('
                             website = VALUES(website),
                             brand = VALUES(brand),
                             employee = VALUES(employee),
+                            sale_channel = VALUES(sale_channel),
                             ty_gia = VALUES(ty_gia),
                             ship_quoc_te = VALUES(ship_quoc_te),
                             phu_thu = VALUES(phu_thu),
