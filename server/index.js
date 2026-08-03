@@ -857,7 +857,7 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         const rows = await db.query(
             `SELECT DATE_FORMAT(o.order_date,'%d-%m-%Y') AS date, o.order_code AS code,
                     c.name AS customer, c.phone AS phone, c.segment AS segment,
-                    o.brand, o.employee, o.website,
+                    o.brand, o.employee, o.website, o.sale_channel,
                     o.ty_gia, o.ship_quoc_te, o.phu_thu, o.giam_gia, o.ly_do_giam_gia, o.amount,
                     (c.id IN (${newSubSql})) AS isNew
              FROM deki_orders o JOIN deki_customers c ON c.id = o.customer_id
