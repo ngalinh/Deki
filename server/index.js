@@ -72,20 +72,20 @@ app.get('/api/me', async (req, res) => {
 app.get('/api/customers', requireAuth(), async (req, res) => {
     try {
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffNames = req.user.staffNames || [];
+        const saleChannels = req.user.saleChannels || [];
 
-        // Non-admin chưa được map tên nhân viên nào → không thấy gì
-        if (!isAdmin && staffNames.length === 0) {
+        // Non-admin chưa được phân kênh sale nào → không thấy gì
+        if (!isAdmin && saleChannels.length === 0) {
             return res.json({
                 success: true,
                 data: [],
-                notice: 'Tài khoản chưa được map với tên nhân viên. Liên hệ admin để được cấp.'
+                notice: 'Tài khoản chưa được phân kênh sale. Liên hệ admin để được cấp.'
             });
         }
 
-        // Build query — filter orders theo employee (IN nhiều tên) nếu không phải admin
-        const orderWhere = isAdmin ? '' : `WHERE employee IN (${staffNames.map(() => '?').join(',')})`;
-        const orderParams = isAdmin ? [] : [...staffNames];
+        // Build query — filter orders theo KÊNH SALE của tài khoản nếu không phải admin
+        const orderWhere = isAdmin ? '' : `WHERE sale_channel IN (${saleChannels.map(() => '?').join(',')})`;
+        const orderParams = isAdmin ? [] : [...saleChannels];
 
         const allOrders = await db.query(
             `SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
@@ -200,13 +200,13 @@ app.get('/api/customers/:id/orders', requireAuth(), async (req, res) => {
     try {
         const id = Number(req.params.id);
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffNames = req.user.staffNames || [];
-        if (!isAdmin && staffNames.length === 0) return res.json({ success: true, data: [] });
+        const saleChannels = req.user.saleChannels || [];
+        if (!isAdmin && saleChannels.length === 0) return res.json({ success: true, data: [] });
 
         const where = isAdmin
             ? 'WHERE customer_id = ?'
-            : `WHERE customer_id = ? AND employee IN (${staffNames.map(() => '?').join(',')})`;
-        const params = isAdmin ? [id] : [id, ...staffNames];
+            : `WHERE customer_id = ? AND sale_channel IN (${saleChannels.map(() => '?').join(',')})`;
+        const params = isAdmin ? [id] : [id, ...saleChannels];
 
         const orders = await db.query(
             `SELECT order_code AS code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
@@ -801,8 +801,8 @@ app.post('/api/partner/follow-tags', requireApiKey(), async (req, res) => {
 app.get('/api/orders', requireAuth(), async (req, res) => {
     try {
         const isAdmin = !!req.user.isDekiAdmin;
-        const staffNames = req.user.staffNames || [];
-        if (!isAdmin && staffNames.length === 0) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
+        const saleChannels = req.user.saleChannels || [];
+        if (!isAdmin && saleChannels.length === 0) return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
 
         // ===== "Khách mới": khách có đơn ĐẦU TIÊN trên TOÀN BỘ thời gian (mọi nhân viên) rơi vào
         // khoảng đang lọc. Không có range (Tất cả thời gian) → tính theo tháng gần nhất có dữ liệu.
@@ -826,7 +826,8 @@ app.get('/api/orders', requireAuth(), async (req, res) => {
         if (isAdmin) {
             if (req.query.employee) { where.push('o.employee = ?'); params.push(req.query.employee); }
         } else {
-            where.push(`o.employee IN (${staffNames.map(() => '?').join(',')})`); params.push(...staffNames);
+            // Non-admin: chỉ thấy đơn thuộc KÊNH SALE được phân cho tài khoản (không theo NV duyệt đơn).
+            where.push(`o.sale_channel IN (${saleChannels.map(() => '?').join(',')})`); params.push(...saleChannels);
         }
         if (req.query.from) { where.push('o.order_date >= ?'); params.push(req.query.from); }
         if (req.query.to) { where.push('o.order_date <= ?'); params.push(req.query.to); }
