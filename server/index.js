@@ -89,7 +89,7 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
 
         const allOrders = await db.query(
             `SELECT customer_id, order_code, DATE_FORMAT(order_date, '%d-%b-%Y') AS date,
-                    order_date, website, brand, employee, amount
+                    order_date, website, brand, employee, sale_channel, amount
              FROM deki_orders ${orderWhere}
              ORDER BY order_date DESC`,
             orderParams
@@ -154,6 +154,7 @@ app.get('/api/customers', requireAuth(), async (req, res) => {
                     website: o.website || '',
                     brand: o.brand || '',
                     employee: o.employee || '',
+                    saleChannel: o.sale_channel || '',
                     amount
                 });
 

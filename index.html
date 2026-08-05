@@ -1494,6 +1494,7 @@
                 <button class="view-btn" id="custTabLe" onclick="switchCustTab('le')">Khách lẻ</button>
                 <button class="view-btn" id="custTabCtv" onclick="switchCustTab('ctv')">Khách CTV</button>
                 <button class="view-btn" id="custTabSi" onclick="switchCustTab('si')">Khách sỉ</button>
+                <button class="view-btn" id="custTabMoi" onclick="switchCustTab('moi')">Khách mới</button>
             </div>
 
             <!-- ===== TAB: Tất cả (ẩn — nay dùng chung view segment bên dưới) ===== -->
@@ -1606,6 +1607,18 @@
                         </div>
                         <select class="filter-select" id="segEmployeeFilter" onchange="renderSegmentTable()">
                             <option value="">Tất cả nhân viên</option>
+                        </select>
+                        <!-- Chỉ hiện ở tab "Khách mới" -->
+                        <select class="filter-select" id="segSegmentFilter" onchange="renderSegmentTable()" style="display:none;">
+                            <option value="">Tất cả nhóm KH</option>
+                            <option value="Khách Lẻ">Khách Lẻ</option>
+                            <option value="CTV">CTV</option>
+                            <option value="Sỉ nhỏ">Sỉ nhỏ</option>
+                            <option value="Sỉ vừa">Sỉ vừa</option>
+                            <option value="Sỉ to">Sỉ to</option>
+                        </select>
+                        <select class="filter-select" id="segSaleChannelFilter" onchange="renderSegmentTable()" style="display:none;">
+                            <option value="">Tất cả kênh sale</option>
                         </select>
                     </div>
                     <div class="tbl-scroll">
@@ -3311,6 +3324,7 @@
             try {
                 const result = await apiGet('/api/customers');
                 allCustomers.splice(0, allCustomers.length, ...(result.data || []));
+                custDataVersion++;   // invalidate cache phụ thuộc allCustomers (vd: latestMonth)
                 return true;
             } catch (err) {
                 console.error('Lỗi load customers:', err);
@@ -3875,17 +3889,30 @@
             si: ['Sỉ nhỏ', 'Sỉ vừa', 'Sỉ to']
         };
         let segSort = { col: null, dir: null };   // null = không sort (giữ thứ tự mặc định: doanh thu giảm dần)
+        let custDataVersion = 0;                          // tăng mỗi lần load customers → invalidate cache
+        let _latestMonthCache = { ver: -1, val: '' };     // cache tháng mới nhất (khách mới)
+        function getLatestOrderMonth() {
+            if (_latestMonthCache.ver === custDataVersion) return _latestMonthCache.val;
+            let latest = '';
+            allCustomers.forEach(c => (c.allOrders || []).forEach(o => {
+                const m = (parseDateToDay(o.date) || '').slice(0, 7);
+                if (m && m > latest) latest = m;
+            }));
+            _latestMonthCache = { ver: custDataVersion, val: latest };
+            return latest;
+        }
         let segSelectedWebsites = [];                     // website đang chọn (multi)
         let segCurrentPage = 1;
         const segPerPage = 20;
 
+        const CUST_TAB_BTN = { all: 'All', le: 'Le', ctv: 'Ctv', si: 'Si', moi: 'Moi' };
         function switchCustTab(tab) {
             custTab = tab;
-            ['all', 'le', 'ctv', 'si'].forEach(t => {
-                const btn = document.getElementById('custTab' + (t === 'all' ? 'All' : t === 'le' ? 'Le' : t === 'ctv' ? 'Ctv' : 'Si'));
+            Object.keys(CUST_TAB_BTN).forEach(t => {
+                const btn = document.getElementById('custTab' + CUST_TAB_BTN[t]);
                 if (btn) btn.classList.toggle('active', t === tab);
             });
-            // Tất cả 4 tab dùng chung view segment (cùng cột + sort + filter)
+            // Tất cả tab dùng chung view segment (cùng cột + sort + filter)
             document.getElementById('cust-all').classList.add('section-hidden');
             document.getElementById('cust-segment').classList.remove('section-hidden');
             segSelectedWebsites = [];
@@ -3896,6 +3923,19 @@
             const ss = document.getElementById('segSearch'); if (ss) ss.value = '';
             const se = document.getElementById('segEmployeeFilter'); if (se) se.value = '';
             populateSegEmployeeFilter();
+            // Tab "Khách mới": hiện thêm lọc nhóm KH + kênh sale
+            const isMoi = tab === 'moi';
+            const segF = document.getElementById('segSegmentFilter');
+            const chanF = document.getElementById('segSaleChannelFilter');
+            if (segF) { segF.style.display = isMoi ? '' : 'none'; segF.value = ''; }
+            if (chanF) {
+                chanF.style.display = isMoi ? '' : 'none';
+                chanF.value = '';
+                if (chanF.options.length <= 1) {
+                    chanF.innerHTML = '<option value="">Tất cả kênh sale</option>' +
+                        SALE_CHANNELS.map(c => `<option value="${c.code}">${c.name}</option>`).join('');
+                }
+            }
             renderSegmentTable();
         }
 
@@ -4037,12 +4077,18 @@
             const segs = SEGMENT_MAP[custTab] || null;   // null = tất cả phân nhóm (tab "Tất cả")
             const isSi = custTab === 'si';
             const isAll = custTab === 'all';
-            const showSeg = isSi || isAll;   // cột Phân nhóm/Loại khách
+            const isMoi = custTab === 'moi';   // Khách mới của tháng mới nhất
+            const showSeg = isSi || isAll || isMoi;   // cột Phân nhóm/Loại khách
             const timeRange = resolveTimeRange('segTimeFilter', 'segCustFrom', 'segCustTo');
             const lastRange = resolveTimeRange('segLastOrderFilter', 'segLastFrom', 'segLastTo');
             const q = removeDiacritics((document.getElementById('segSearch').value || '').trim()).toLowerCase();
             const webSet = segSelectedWebsites;
             const empF = document.getElementById('segEmployeeFilter')?.value || '';
+            // Bộ lọc riêng cho tab Khách mới
+            const moiSeg = isMoi ? (document.getElementById('segSegmentFilter')?.value || '') : '';
+            const moiChan = isMoi ? (document.getElementById('segSaleChannelFilter')?.value || '') : '';
+            // Tháng mới nhất có đơn trong toàn bộ dữ liệu → định nghĩa "khách mới của tháng mới nhất"
+            const latestMonth = isMoi ? getLatestOrderMonth() : '';
 
             // Tính metrics theo filter cho từng khách thuộc segment
             const rows = [];
@@ -4051,10 +4097,13 @@
                 if (q && !removeDiacritics(c.name).toLowerCase().includes(q) && !(c.phone || '').includes(q)) return;
 
                 let orders = 0, revenue = 0, lastOrder = '';
+                let firstDay = null, firstEmp = '', firstChan = '';   // đơn đầu tiên (toàn bộ) → nhân viên + kênh sale
                 const websitesSet = new Set();
                 (c.allOrders || []).forEach(o => {
                     const ymd = parseDateToDay(o.date);
                     if (ymd && (!lastOrder || ymd > lastOrder)) lastOrder = ymd; // đơn gần nhất (toàn bộ)
+                    // Đơn đầu tiên: ymd nhỏ nhất; allOrders xếp DESC nên khi trùng ngày, lần lặp sau (index lớn) là đơn cũ hơn
+                    if (ymd && (firstDay === null || ymd <= firstDay)) { firstDay = ymd; firstEmp = o.employee || ''; firstChan = o.saleChannel || ''; }
                     // áp filter thời gian + website + nhân viên cho metrics
                     if (timeRange && (!ymd || ymd < timeRange.from || ymd > timeRange.to)) return;
                     if (webSet.length && !webSet.includes(o.website)) return;
@@ -4064,6 +4113,13 @@
                     if (o.website && o.website !== 'N/A') websitesSet.add(o.website);
                 });
 
+                // Tab Khách mới: chỉ giữ khách có đơn ĐẦU TIÊN rơi vào tháng mới nhất + lọc nhóm KH/kênh sale
+                if (isMoi) {
+                    if (!firstDay || firstDay.slice(0, 7) !== latestMonth) return;
+                    if (moiSeg && c.segment !== moiSeg) return;
+                    if (moiChan && firstChan !== moiChan) return;
+                }
+
                 if (orders === 0) return; // không có đơn thỏa filter → ẩn
                 // filter theo đơn gần nhất
                 if (lastRange && (!lastOrder || lastOrder < lastRange.from || lastOrder > lastRange.to)) return;
@@ -4071,7 +4127,8 @@
                 rows.push({
                     id: c.id, name: c.name, segment: c.segment,
                     websites: webSet.length ? Array.from(websitesSet) : (c.websites || []).filter(w => w && w !== 'N/A'),
-                    orders, revenue, avg: orders ? revenue / orders : 0, lastOrder
+                    orders, revenue, avg: orders ? revenue / orders : 0, lastOrder,
+                    employee: firstEmp, saleChannel: firstChan
                 });
             });
 
@@ -4103,7 +4160,8 @@
             };
             document.getElementById('segTableHead').innerHTML = `
                 <th>Khách hàng</th>
-                ${showSeg ? `<th>${isAll ? 'Phân nhóm' : 'Loại khách'}</th>` : ''}
+                ${showSeg ? `<th>${isSi ? 'Loại khách' : 'Phân nhóm'}</th>` : ''}
+                ${isMoi ? `<th>Kênh sale</th><th>Nhân viên</th>` : ''}
                 <th>Websites</th>
                 <th style="text-align:right;">SL đơn hàng${sortIcon('orders')}</th>
                 <th style="text-align:right;">Tổng doanh thu${sortIcon('revenue')}</th>
@@ -4114,7 +4172,7 @@
             setCustHeaderCount(rows.length);
 
             const tbody = document.getElementById('segTableBody');
-            const colspan = showSeg ? 7 : 6;
+            const colspan = 6 + (showSeg ? 1 : 0) + (isMoi ? 2 : 0);
             if (rows.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center; padding:40px; color:var(--text-light);">Không có khách hàng phù hợp</td></tr>`;
                 document.getElementById('segCount').textContent = '';
@@ -4136,10 +4194,15 @@
                        </div>`
                     : '-';
                 const segBadge = showSeg ? `<td><span class="badge ${removeDiacritics(r.segment).toLowerCase().replace(/\s+/g,'-')}">${r.segment}</span></td>` : '';
+                const moiCols = isMoi
+                    ? `<td style="color:var(--text-gray);">${r.saleChannel ? (saleChannelName(r.saleChannel) || r.saleChannel) : '-'}</td>
+                       <td style="color:var(--text-gray);">${r.employee || '-'}</td>`
+                    : '';
                 return `
                     <tr onclick="showCustomerDetail('${r.id}')" style="cursor:pointer;">
                         <td class="customer-name">${clampName(r.name)}</td>
                         ${segBadge}
+                        ${moiCols}
                         <td>${webChips}</td>
                         <td style="text-align:right; font-weight:700;">${r.orders.toLocaleString('en-US')}</td>
                         <td style="text-align:right; font-weight:700;">${r.revenue.toLocaleString('en-US')} đ</td>
