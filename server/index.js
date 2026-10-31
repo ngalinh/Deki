@@ -951,7 +951,7 @@ app.get('/api/orders/order-link', requireAuth(), async (req, res) => {
         const data = await r.json().catch(() => null);
         const id = data?.data?.order?.id;
         if (!id) return res.status(404).json({ success: false, error: 'Không tìm thấy đơn trên Basso' });
-        res.json({ success: true, id, url: `${BASSO.url}/basso/customer_order/detail/${id}` });
+        res.json({ success: true, id, url: `${BASSO.url}/hethong/basso/customer_order/detail/${id}` });
     } catch (e) {
         console.error('[basso] order-link failed:', e.message);
         res.status(500).json({ success: false, error: 'Tra cứu đơn thất bại' });
