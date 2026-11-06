@@ -959,7 +959,7 @@ app.get('/api/orders/order-link', requireAuth(), async (req, res) => {
 });
 
 // GET /api/orders/customer-link?phone=09xxx → { url } mở trang chi tiết khách trên basso.vn
-// Tra findCustomerByPhone (Partner API) → data.customer.id (users.id) → /management/customer/detail/<id>
+// Tra findCustomerByPhone (Partner API) → data.customer.id (users.id) → /hethong/hethong/management/customer/detail/<id>
 app.get('/api/orders/customer-link', requireAuth(), async (req, res) => {
     const phone = String(req.query.phone || '').trim();
     if (!phone) return res.status(400).json({ success: false, error: 'Khách chưa có số điện thoại' });
@@ -977,7 +977,7 @@ app.get('/api/orders/customer-link', requireAuth(), async (req, res) => {
         const data = await r.json().catch(() => null);
         const id = data?.data?.customer?.id;
         if (!id) return res.status(404).json({ success: false, error: 'Không tìm thấy khách trên Basso' });
-        res.json({ success: true, id, url: `${BASSO.url}/management/customer/detail/${id}` });
+        res.json({ success: true, id, url: `${BASSO.url}/hethong/management/customer/detail/${id}` });
     } catch (e) {
         console.error('[basso] customer-link failed:', e.message);
         res.status(500).json({ success: false, error: 'Tra cứu khách thất bại' });
